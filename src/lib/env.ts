@@ -11,7 +11,9 @@ const publicSchema = z.object({
   NEXT_PUBLIC_AUTH_PROVIDERS: z.string().optional().default(""),
 });
 
-export const publicEnv = publicSchema.parse({
+/** No build sem variáveis (primeiro deploy), usa valores neutros; em execução a validação é estrita. */
+const building = process.env.NEXT_PHASE === "phase-production-build";
+const raw = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
   NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   // Na Vercel, sem NEXT_PUBLIC_SITE_URL, usa o domínio de produção do projeto.
@@ -19,7 +21,10 @@ export const publicEnv = publicSchema.parse({
     process.env.NEXT_PUBLIC_SITE_URL ||
     (process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_PROJECT_PRODUCTION_URL}` : undefined),
   NEXT_PUBLIC_AUTH_PROVIDERS: process.env.NEXT_PUBLIC_AUTH_PROVIDERS,
-});
+};
+export const publicEnv = building
+  ? publicSchema.parse({ ...raw, NEXT_PUBLIC_SUPABASE_URL: raw.NEXT_PUBLIC_SUPABASE_URL || "https://build.invalid", NEXT_PUBLIC_SUPABASE_ANON_KEY: raw.NEXT_PUBLIC_SUPABASE_ANON_KEY || "build" })
+  : publicSchema.parse(raw);
 
 export const OAUTH_PROVIDERS = ["azure", "google", "apple"] as const;
 export type OAuthProvider = (typeof OAUTH_PROVIDERS)[number];

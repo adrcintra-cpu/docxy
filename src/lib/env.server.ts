@@ -8,8 +8,9 @@ const serverSchema = z.object({
   AUDIT_IP_SALT: z.string().optional(),
 });
 
+const building = process.env.NEXT_PHASE === "phase-production-build";
 export const serverEnv = serverSchema.parse({
-  DATABASE_URL: process.env.DATABASE_URL,
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  DATABASE_URL: process.env.DATABASE_URL || (building ? "postgresql://build/build" : undefined),
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || (building ? "build" : undefined),
   AUDIT_IP_SALT: process.env.AUDIT_IP_SALT,
 });
