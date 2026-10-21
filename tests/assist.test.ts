@@ -66,6 +66,7 @@ test("sem IA: alterações e valores vêm do motor, com citações dos dois lado
   assert.ok(v.citations.some((c) => c.versionId === "v1") && v.citations.some((c) => c.versionId === "v2"));
   const ob = ruleAnswer("Quais obrigações foram adicionadas?", docs, cmp);
   assert.match(ob.answer, /Sigilo|manterão sigilo/);
+  assert.ok(!/Movido/.test(ob.answer), "trecho movido não é obrigação nova");
   const none = ruleAnswer("Qual é a cor do navio?", docs, cmp);
   assert.equal(none.found, false);
   assert.equal(none.citations.length, 0);

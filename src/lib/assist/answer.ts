@@ -90,7 +90,7 @@ export function ruleAnswer(question: string, docs: SourceDoc[], comparison?: Com
     if (intent === "obligations")
       return fromChanges(
         docs,
-        ch.filter((c) => c.revisedText && (!c.baseText || c.type !== "REMOVED") && OBLIGATION.test(fold(c.revisedText))),
+        ch.filter((c) => c.revisedText && !["REMOVED", "MOVED", "FORMATTING"].includes(c.type) && OBLIGATION.test(fold(c.revisedText))),
         "Trechos com obrigações incluídos ou alterados no revisado:",
         "Não encontrei obrigações novas no documento revisado.",
       );
