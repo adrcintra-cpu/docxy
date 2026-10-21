@@ -17,6 +17,7 @@ import { UploadButton } from "@/components/documents/upload-dialog";
 import { StatusChip } from "@/components/ui/status-chip";
 import { CompareButton } from "@/components/compare/compare-dialog";
 import { RetryProcessingButton } from "@/components/documents/retry-button";
+import { AIBlockToggle } from "@/components/documents/ai-block-toggle";
 import { getVersionOptions } from "@/lib/queries/compare";
 
 export const metadata: Metadata = { title: "Documento" };
@@ -129,6 +130,8 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
             canEdit={can(role, "document.edit")}
             onSave={updateDocumentDescription.bind(null, document.id)}
           />
+          <div className="h-px bg-line/60" />
+          <AIBlockToggle documentId={document.id} blocked={document.aiBlocked} canEdit={can(role, "document.edit")} />
           <div className="h-px bg-line/60" />
           <SharePanel
             kind="document"

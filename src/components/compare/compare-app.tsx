@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeftRight, BarChart3, ChevronDown, ChevronUp, FileText, Filter, Link2, Link2Off, List, MessageSquare, MoreVertical, Plus, Search } from "lucide-react";
+import { ArrowLeftRight, BarChart3, ChevronDown, ChevronUp, FileText, Filter, Link2, Link2Off, MessageSquare, MoreVertical, Plus } from "lucide-react";
 import { addChangeComment, setChangeReview } from "@/app/actions/compare";
 import { CHANGE_LABEL, changeGroup, NUMERIC_TYPES, type ChangeType, type CompareMetrics, type Rect } from "@/lib/compare/types";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,13 @@ import { ToolRail, type ToolId } from "@/components/viewer/tool-rail";
 import { CompareDialog, type VersionOption } from "./compare-dialog";
 import { buildAnchors, fromLinear, mapPosition, toLinear, type Anchor } from "./sync";
 import { toast } from "@/components/ui/toast";
+import type { ExtractionView, ExtractorView } from "@/lib/extract/server";
+import { AskBar, AssistantPanel, useAssistant } from "@/components/insight/assistant-panel";
+import { DashboardDialog } from "@/components/insight/dashboard-dialog";
+import { ExtractorPanel } from "@/components/insight/extractor-panel";
+import { fieldsJson, JsonPanel } from "@/components/insight/json-panel";
+import { locateIn, type LocateTarget } from "@/components/insight/shared";
+import { SummaryPanel } from "@/components/insight/summary-panel";
 
 export interface ChangeSideData {
   from: number;
@@ -45,7 +52,7 @@ const FILTERS: { id: Filter; label: string }[] = [
   { id: "relevant", label: "Relevantes" },
   { id: "pending", label: "Pendentes" },
 ];
-const PHASE4 = "Fase 4";
+type Panel = "compare" | "metrics" | "extract" | "assistant" | "summary" | "code";
 
 function matchesFilter(c: ChangeItem, f: Filter) {
   if (f === "all") return true;
@@ -72,6 +79,10 @@ export function CompareApp({
   options,
   canReview,
   canComment,
+  extractors,
+  extractions,
+  canExtract,
+  canAsk,
 }: {
   comparisonId: string;
   base: ViewerDoc;
@@ -81,6 +92,11 @@ export function CompareApp({
   options: VersionOption[];
   canReview: boolean;
   canComment: boolean;
+  extractors: ExtractorView[];
+  /** Últimas extrações das duas versões. */
+  extractions: ExtractionView[];
+  canExtract: boolean;
+  canAsk: boolean;
 }) {
   const router = useRouter();
   const paneA = useRef<PaneHandle>(null);
@@ -88,7 +104,19 @@ export function CompareApp({
   const syncing = useRef<0 | 1 | null>(null);
   const [changes, setChanges] = useState(initial);
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [panel, setPanel] = useState<"compare" | "metrics">("compare");
+  const [panel, setPanel] = useState<Panel>("compare");
+  const [dashboard, setDashboard] = useState(false);
+  const [focusHl, setFocusHl] = useState<{ side: 0 | 1; hl: Highlight } | null>(null);
+  const [extractionList, setExtractionList] = useState(extractions);
+  const assistant = useAssistant({ versionIds: [base.versionId, revised.versionId], comparisonId });
+  const vsName = (d: ViewerDoc) => `${d.title} (vs${String(d.versionNumber).padStart(2, "0")})`;
+  const titles = { [base.versionId]: `Original · ${vsName(base)}`, [revised.versionId]: `Revisado · ${vsName(revised)}` };
+  const locate = (t: LocateTarget) => {
+    const side: 0 | 1 = t.versionId === base.versionId ? 0 : 1;
+    syncing.current = side;
+    setFocusHl({ side, hl: locateIn(side === 0 ? paneA.current : paneB.current, side === 0 ? base : revised, t) });
+    setTimeout(() => (syncing.current = null), 700);
+  };
   const [filter, setFilter] = useState<Filter>("all");
   const [text, setText] = useState("");
   const [sync, setSync] = useState(true);
@@ -121,8 +149,11 @@ export function CompareApp({
           },
         ];
       });
-    return { a: mk("base", base), b: mk("revised", revised) };
-  }, [changes, activeId, base, revised]);
+    const a = mk("base", base);
+    const b = mk("revised", revised);
+    if (focusHl) (focusHl.side === 0 ? a : b).push(focusHl.hl);
+    return { a, b };
+  }, [changes, activeId, base, revised, focusHl]);
 
   // ─── Rolagem sincronizada pelas alterações ─────────────────────────────
   const anchors = useMemo(() => {
@@ -154,6 +185,7 @@ export function CompareApp({
       const c = changes.find((x) => x.id === id);
       if (!c) return;
       setActiveId(id);
+      setFocusHl(null);
       syncing.current = 0; // a próxima rolagem é nossa, não sincroniza de volta
       const go = (pane: PaneHandle | null, doc: ViewerDoc, s: ChangeSideData | null, page: number | null, hasText: boolean) => {
         if (!pane) return;
@@ -203,6 +235,8 @@ export function CompareApp({
       setPanel("compare");
       setFilter("pending");
     }
+    if (id === "extract" || id === "assistant" || id === "code") setPanel(id);
+    if (id === "dashboard") setDashboard(true);
     if (id === "split" || id === "versions") setComparing(true);
     if (id === "download") window.location.href = `/api/comparacoes/${comparisonId}/relatorio`;
   };
@@ -240,24 +274,10 @@ export function CompareApp({
           <Minimap changes={changes} activeId={activeId} basePages={base.pages.length} revisedPages={revised.pages.length} onSelect={focus} onStep={step} />
           <DocumentPane ref={paneB} doc={revised} highlights={highlights.b} onScroll={onScroll(1)} onHighlightClick={focus} onClose={() => router.push(`/documentos/${revised.documentId}`)} className="min-h-[60vh]" />
         </div>
-        {/* Barra do assistente (referência 06) — Fase 4 */}
-        <div className="flex items-center gap-6 rounded-lg bg-surface px-6 py-4" title="Assistente de IA — disponível na Fase 4">
-          <span className="flex items-center gap-2 text-body-sm text-ink-subtle">
-            <List className="size-4" /> Ver conversa
-          </span>
-          <div className="relative flex h-11 flex-1 items-center opacity-60">
-            <input disabled placeholder="Digite o tópico relacionado… (assistente na Fase 4)" aria-label="Pergunta ao assistente (indisponível)" className="h-full w-full rounded-full bg-page pl-5 pr-14 text-body-sm placeholder:text-ink-muted" />
-            <span className="absolute right-1 flex size-9 items-center justify-center rounded-full bg-brand text-on-light">
-              <Search className="size-4" strokeWidth={2.25} />
-            </span>
-          </div>
-          <span className="flex items-center gap-2 text-body-sm text-ink-subtle">
-            <FileText className="size-4" /> Resumo
-          </span>
-        </div>
+        {canAsk && <AskBar state={assistant} onOpenConversation={() => setPanel("assistant")} onOpenSummary={() => setPanel("summary")} />}
       </div>
 
-      <aside className="flex w-[320px] shrink-0 flex-col rounded-lg bg-surface" aria-label={panel === "compare" ? "Lista de mudanças" : "Métricas"}>
+      <aside className="flex w-[320px] shrink-0 flex-col rounded-lg bg-surface" aria-label="Painel de ferramentas">
         {panel === "compare" ? (
           <>
             <div className="flex items-center gap-3 px-5 pb-3 pt-5">
@@ -309,21 +329,47 @@ export function CompareApp({
               </button>
             </div>
           </>
-        ) : (
+        ) : panel === "metrics" ? (
           <MetricsPanel metrics={metrics} />
+        ) : panel === "extract" ? (
+          <ExtractorPanel
+            docs={[
+              { versionId: base.versionId, title: vsName(base), label: "Original" },
+              { versionId: revised.versionId, title: vsName(revised), label: "Revisado" },
+            ]}
+            extractors={extractors}
+            initial={extractionList}
+            canRun={canExtract}
+            onLocate={locate}
+            onResult={(v) => setExtractionList((xs) => [v, ...xs.filter((x) => !(x.extractorId === v.extractorId && x.versionId === v.versionId))])}
+          />
+        ) : panel === "assistant" ? (
+          <AssistantPanel state={assistant} titles={titles} onLocate={locate} />
+        ) : panel === "summary" ? (
+          <SummaryPanel scope={{ versionIds: [base.versionId, revised.versionId], comparisonId }} titles={titles} fileBase={`Comparação ${base.title}`} onLocate={locate} />
+        ) : (
+          <JsonPanel
+            fileBase={`Comparação ${base.title}`}
+            data={{
+              comparacao: { id: comparisonId, original: vsName(base), revisado: vsName(revised), motor: metrics.engineVersion, percentualDeDiferenca: metrics.differencePercent, totais: metrics.changes, palavras: metrics.words },
+              alteracoes: changes.map((c) => ({ posicao: c.position, tipo: c.type, rotulo: CHANGE_LABEL[c.type], relevante: c.relevant, original: c.baseText, revisado: c.revisedText, paginaOriginal: c.basePage, paginaRevisado: c.revisedPage, revisao: c.reviewStatus })),
+              extracoes: extractionList.map((x) => ({ documento: x.versionId === base.versionId ? "original" : "revisado", extrator: extractors.find((e) => e.id === x.extractorId)?.name ?? x.extractorId, campos: fieldsJson(x.values) })),
+            }}
+          />
         )}
       </aside>
 
       <ToolRail
-        active={panel === "metrics" ? "metrics" : filter === "pending" ? "review" : "compare"}
+        active={dashboard ? "dashboard" : panel === "compare" ? (filter === "pending" ? "review" : "compare") : panel === "summary" ? "assistant" : panel}
         onSelect={onTool}
         states={{
-          code: { unavailable: PHASE4 },
-          extract: { unavailable: PHASE4 },
-          assistant: { unavailable: PHASE4 },
-          dashboard: { unavailable: PHASE4 },
+          extract: canExtract ? {} : { unavailable: "seu perfil não permite extrair" },
+          assistant: canAsk ? {} : { unavailable: "seu perfil não permite usar o assistente" },
+          dashboard: extractors.length ? {} : { unavailable: "nenhum extrator ativo" },
         }}
       />
+
+      <DashboardDialog open={dashboard} onClose={() => setDashboard(false)} comparisonId={comparisonId} extractors={extractors} titles={{ base: vsName(base), revised: vsName(revised) }} onLocate={(t) => (setDashboard(false), locate(t))} />
 
       {comparing && <CompareDialog options={options} defaultBase={base.versionId} defaultRevised={revised.versionId} onClose={() => setComparing(false)} />}
     </div>

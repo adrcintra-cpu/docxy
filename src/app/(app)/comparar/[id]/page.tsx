@@ -5,6 +5,7 @@ import { can } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import { getVersionOptions, getViewerDoc } from "@/lib/queries/compare";
+import { getExtractors, getLatestExtractions } from "@/lib/extract/server";
 import type { CompareMetrics, ChangeType } from "@/lib/compare/types";
 import { CompareApp, type ChangeItem, type ChangeSideData } from "@/components/compare/compare-app";
 import { UnavailableState } from "@/components/ui/card";
@@ -39,7 +40,7 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
     );
   }
 
-  const [base, revised, rows, options] = await Promise.all([
+  const [base, revised, rows, options, extractors, exBase, exRevised] = await Promise.all([
     getViewerDoc(ctx, comparison.baseVersionId),
     getViewerDoc(ctx, comparison.revisedVersionId),
     db.comparisonChange.findMany({
@@ -48,6 +49,9 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
       include: { comments: { where: { deletedAt: null }, orderBy: { createdAt: "asc" }, include: { author: { select: { name: true, email: true } } } } },
     }),
     getVersionOptions(ctx, comparison.revisedVersion.documentId),
+    getExtractors(ctx),
+    getLatestExtractions(comparison.baseVersionId),
+    getLatestExtractions(comparison.revisedVersionId),
   ]);
   if (!base || !revised) notFound();
 
@@ -79,6 +83,10 @@ export default async function ComparisonPage({ params }: { params: Promise<{ id:
       options={options}
       canReview={can(role, "comparison.review")}
       canComment={can(role, "comment.write")}
+      extractors={extractors}
+      extractions={[...exBase, ...exRevised]}
+      canExtract={can(role, "extraction.run")}
+      canAsk={can(role, "ai.ask")}
     />
   );
 }

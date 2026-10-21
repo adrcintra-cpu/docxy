@@ -156,6 +156,11 @@ model Organization {
   name      String
   slug      String    @unique
   logoUrl   String?   @map("logo_url")
+  /// Autorização da organização para enviar texto de documentos ao provedor de IA configurado.
+  /// Desligada por padrão: sem ela, extração, assistente e resumos usam só regras determinísticas.
+  aiEnabled     Boolean   @default(false) @map("ai_enabled")
+  aiEnabledAt   DateTime? @map("ai_enabled_at") @db.Timestamptz(6)
+  aiEnabledById String?   @map("ai_enabled_by_id") @db.Uuid
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
@@ -291,6 +296,8 @@ model Document {
   description      String?
   tags             String[]       @default([])
   status           DocumentStatus @default(UPLOADING)
+  /// Documento confidencial: nunca é enviado ao provedor de IA, mesmo com a IA da organização ligada.
+  aiBlocked        Boolean        @default(false) @map("ai_blocked")
   /// Versão exibida por padrão; atualizada a cada novo upload.
   currentVersionId String?        @unique @map("current_version_id") @db.Uuid
   createdById      String         @map("created_by_id") @db.Uuid
@@ -513,7 +520,10 @@ model Extractor {
   name           String
   /// contrato, apólice, jurídico, financeiro, proposta…
   documentKind   String    @map("document_kind")
-  /// Campos esperados: [{key, label, type, required, hint}]
+  description    String?
+  /// Modelo padrão de origem (contratos, apolices…); nulo = criado pela organização.
+  template       String?
+  /// Campos esperados: [{key, label, type, aliases, hint, required}] (src/lib/extract/types.ts)
   fields         Json
   active         Boolean   @default(true)
   createdById    String    @map("created_by_id") @db.Uuid
@@ -533,9 +543,13 @@ model ExtractionResult {
   extractorId String           @map("extractor_id") @db.Uuid
   versionId   String           @map("version_id") @db.Uuid
   status      ExtractionStatus @default(QUEUED)
-  /// [{key, value|null ("Não identificado"), confidence, page, rects, sourceText, corrected, correctedValue}]
+  /// FieldResult[] (src/lib/extract/types.ts): valor ou null ("Não identificado"), confiança,
+  /// origem (regra, IA verificada, manual) e evidência (página, trecho, retângulos).
   values      Json?
   error       String?
+  /// Versão das regras de extração usadas (docxy-extract/x.y.z).
+  engine      String?
+  /// Modelo de IA que complementou o resultado, quando houve.
   model       String?
   requestedById String         @map("requested_by_id") @db.Uuid
   createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -545,7 +559,7 @@ model ExtractionResult {
   version     DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
   requestedBy User            @relation(fields: [requestedById], references: [id], onDelete: Restrict)
 
-  @@index([versionId])
+  @@index([versionId, extractorId, createdAt(sort: Desc)])
   @@map("extraction_results")
 }
 
@@ -575,8 +589,10 @@ model AIMessage {
   conversationId String        @map("conversation_id") @db.Uuid
   role           AIMessageRole
   content        String
-  /// Evidências: [{versionId, page, text, rects}]
+  /// { items: Citation[], explanation?, found } (src/lib/assist/types.ts) — evidências com versão, página, trecho e retângulos.
   citations      Json?
+  /// "ia" (provedor configurado) ou "regras" (resposta extrativa, sem IA).
+  mode           String?
   model          String?
   createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
 

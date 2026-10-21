@@ -68,6 +68,7 @@ Decisões:
 | `NEXT_PUBLIC_SITE_URL` | público | URLs de retorno dos e-mails e OAuth |
 | `NEXT_PUBLIC_AUTH_PROVIDERS` | público | provedores sociais exibidos |
 | `AUDIT_IP_SALT` | servidor (opcional) | anonimização de IP |
+| `AI_PROVIDER`, `AI_MODEL`, `AI_API_KEY`, `AI_BASE_URL`, `AI_TIMEOUT_MS` | servidor (opcional) | provedor de IA (`none`, `anthropic`, `openai`/compatível) |
 
 ## Documentos (Fase 2)
 
@@ -129,7 +130,47 @@ Os testes (`npm test`) cobrem o diff, a classificação e uma comparação de PD
 - `/documentos/:id/ver` — visualizador (PDF.js com camada de destaques; DOCX em texto), páginas, zoom, ajustar à largura/página, pesquisa, tela cheia, download e troca de versão.
 - `/comparar/:id` — original × revisado com rolagem sincronizada pelas alterações, mapa de diferenças, lista de mudanças (filtros, revisada/ignorada, comentários, anterior/próxima), métricas e exportação em CSV (`/api/comparacoes/:id/relatorio`).
 
+## Inteligência documental (Fase 4)
+
+Princípio: **nada é afirmado sem evidência.** Todo valor, resposta ou tópico de resumo aponta para um trecho real (versão, página, texto e retângulos), clicável para localizar no visualizador.
+
+### Corpus
+
+`src/lib/extract/corpus.ts` transforma as páginas lidas (`version_pages`) em tokens com página, parágrafo, caixa e índice do motor de comparação. Extração, busca e resumos trabalham sobre ele; `locateQuote` confere se um trecho citado existe de fato no documento.
+
+### Extração (`src/lib/extract`)
+
+1. **Modelos** (`templates.ts`): Contratos, Apólices, Documentos jurídicos, Financeiros e Propostas comerciais. Cada organização recebe cópias editáveis em `extractors` na primeira vez; administradores/owners criam e editam modelos em `/extratores` (campos com nome, tipo e rótulos que antecedem o valor).
+2. **Regras** (`rules.ts`, `docxy-extract/1.0.0`): acha o rótulo, lê o valor conforme o tipo (valor monetário e moeda, data, período, percentual, parte, código, texto, listas de valores/percentuais/obrigações) e guarda a evidência. Confiança vem da distância entre rótulo e valor, do separador (":") e de quão genérico é o rótulo.
+3. **IA verificada** (`ai.ts`), só se autorizada: preenche apenas campos vazios e precisa devolver o trecho literal; o trecho é procurado no texto e precisa conter o valor, senão a resposta é descartada.
+4. **Correção manual**: `correctField` grava o novo valor (ou "Não identificado"), quem corrigiu e o valor original. Tudo vai para `extraction_results` com a versão das regras e o modelo usado.
+
+### Dashboard de comparação
+
+`getComparisonDashboard` garante a extração das duas versões com o mesmo extrator e `compareExtractions` classifica cada campo (igual, alterado, só no original/revisado, não identificado), calcula variação percentual de valores e diferença em dias de datas, e marca divergências relevantes. Barras horizontais (valores) e rosca (percentuais) usam só valores extraídos.
+
+### Assistente (`src/lib/assist`)
+
+- **Busca**: BM25 sobre trechos de até 80 palavras, com radicais simples e sinônimos do domínio (valor ↔ prêmio, prazo ↔ vigência…).
+- **Sem IA**: perguntas sobre alterações, valores, cláusulas e obrigações novas são respondidas com os dados do motor de comparação; as demais com os trechos mais relevantes, citados literalmente. Sem trecho relevante, a resposta diz que não encontrou.
+- **Com IA**: a IA recebe só fontes numeradas (trechos `S#` e alterações `C#`), o documento é tratado como dado (não instrução) e a resposta precisa citar fontes. Citações inexistentes são removidas; resposta sem citação válida vira "não encontrei evidência".
+- **Histórico** em `ai_conversations`/`ai_messages`, por usuário e por documento ou comparação; o acesso é conferido de novo a cada abertura. Limite de 20 perguntas por minuto por usuário. A auditoria registra o uso, nunca o texto da pergunta.
+
+### Resumos
+
+Executivo, alterações, contratual, riscos e financeiro são montados a partir de fatos com evidência (campos extraídos, alterações, trechos com termos de risco). Com IA, ela só reescreve esses fatos e cada tópico precisa citar os fatos que usou. Copiar e exportar em Markdown. Resumos de alterações e de riscos trazem o aviso de que não substituem a avaliação jurídica ou profissional.
+
+### Política de IA (`src/lib/ai`)
+
+O texto só sai do servidor quando há (1) provedor configurado (`AI_PROVIDER`, chave só no backend), (2) autorização da organização (`organizations.ai_enabled`, só administradores, auditado) e (3) nenhum documento confidencial (`documents.ai_blocked`). Falhas do provedor nunca quebram a tela: a resposta volta por regras, com aviso.
+
+### Telas e menu
+
+- Visualizador e comparação: ferramentas **Dados estruturados (JSON)**, **Extrator**, **Assistente** e **Dashboard** no painel direito; barra "Ver conversa · pergunta · Resumo" abaixo dos documentos.
+- `/extratores` (menu Extrator): modelos de extração e configurações de IA.
+- `/salvos` (menu Salvar): comparações, extrações e conversas guardadas.
+- Detalhe do documento: chave "Confidencial — não enviar à IA".
+
 ## Próximas fases
 
-4. Extração inteligente, dashboard de comparação, assistente e resumos.
 5. Notificações completas, histórico/auditoria na interface, responsividade e endurecimento de segurança.

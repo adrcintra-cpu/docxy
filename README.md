@@ -2,7 +2,7 @@
 
 Plataforma SaaS para gerenciar, ler, comparar e extrair informações de documentos — contratos, apólices, documentos jurídicos e financeiros.
 
-> **Estado atual: Fase 3 — Leitura e comparação.** Além da fundação e dos documentos (pastas, upload, versões, compartilhamento, workspaces), já funcionam a leitura de texto (PDF, DOCX e OCR opcional), o visualizador, o motor de comparação, a lista de mudanças com revisão e comentários, o mapa de diferenças e as métricas. As funções das próximas fases aparecem na interface marcadas como indisponíveis (nunca como botões que não fazem nada). Plano completo em [`docs/brief.md`](docs/brief.md).
+> **Estado atual: Fase 4 — Inteligência documental.** Além da fundação, dos documentos e da leitura/comparação, já funcionam a extração de dados com extratores configuráveis, o dashboard de comparação, o assistente com respostas citando página e trecho, e os resumos (executivo, alterações, contratual, riscos e financeiro). Tudo funciona sem IA, por regras determinísticas; com um provedor configurado e autorizado pela organização, a IA complementa — sempre presa a trechos verificados do documento. Plano completo em [`docs/brief.md`](docs/brief.md).
 
 ## Stack
 
@@ -68,6 +68,10 @@ src/
     supabase/          clientes server/middleware e cookies ("Manter conectado")
     audit.ts           trilha de auditoria
     db.ts              Prisma client
+    compare/           motor de comparação determinístico
+    extract/           corpus (texto com coordenadas), regras de extração, modelos, IA verificada, comparação de campos
+    assist/            busca de trechos (BM25), respostas com citação, resumos
+    ai/                provedor de IA configurável (server-only) e política de envio
   middleware.ts        renovação de sessão e proteção de rotas
 prisma/schema.prisma   modelo de dados (22 tabelas)
 supabase/sql/          segurança no banco (RLS, triggers, storage)
@@ -79,7 +83,8 @@ docs/                  brief, arquitetura, design system e telas de referência
 - Sessão validada no servidor a cada requisição (`auth.getUser()`), cookies `httpOnly`.
 - Permissões verificadas no servidor por `requirePermission(action)`; a interface só esconde controles.
 - Isolamento por organização: toda consulta filtra por `organization_id`; RLS bloqueia acesso direto pela API pública do Supabase.
-- Chaves secretas (`SUPABASE_SERVICE_ROLE_KEY`) só em módulos `server-only`.
+- Chaves secretas (`SUPABASE_SERVICE_ROLE_KEY`, `AI_API_KEY`) só em módulos `server-only`.
+- IA desligada por padrão: texto só vai ao provedor com provedor configurado **e** autorização da organização, e nunca para documentos marcados como confidenciais. Toda resposta da IA é conferida contra o texto real antes de ser mostrada.
 - Auditoria somente-inserção, com IP anonimizado e sem conteúdo de documentos.
 - Histórico documental sem exclusão em cascata; pastas e documentos usam exclusão lógica.
 

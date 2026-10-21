@@ -18,8 +18,8 @@ interface MenuItem {
 
 const ITEMS: MenuItem[] = [
   { label: "Abrir", icon: FileUp, action: "document.read", href: "/" },
-  { label: "Salvar", icon: Save, action: "document.upload", phase: "Fase 4" },
-  { label: "Extrator", icon: SquareArrowOutUpRight, action: "extraction.run", phase: "Fase 4" },
+  { label: "Salvar", icon: Save, action: "document.read", href: "/salvos" },
+  { label: "Extrator", icon: SquareArrowOutUpRight, action: "document.read", href: "/extratores" },
   { label: "Compartilhar", icon: Share2, action: "document.read", href: "/compartilhados" },
   { label: "Histórico", icon: History, action: "document.read", phase: "Fase 5" },
   { label: "Workspace", icon: Users, action: "document.read", href: "/workspaces" },

@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { getCtx, requireDocument } from "@/lib/access";
+import { can } from "@/lib/auth/permissions";
+import { getExtractors, getLatestExtractions } from "@/lib/extract/server";
 import { db } from "@/lib/db";
 import { NotFoundError } from "@/lib/errors";
 import { getVersionOptions, getViewerDoc } from "@/lib/queries/compare";
@@ -17,8 +19,9 @@ export default async function ViewerPage({ params, searchParams }: { params: Pro
   const { v } = await searchParams;
   const ctx = await getCtx();
   let document;
+  let role;
   try {
-    document = (await requireDocument(ctx, id, "document.read")).document;
+    ({ document, role } = await requireDocument(ctx, id, "document.read"));
   } catch (err) {
     if (err instanceof NotFoundError) notFound();
     throw err;
@@ -32,7 +35,13 @@ export default async function ViewerPage({ params, searchParams }: { params: Pro
   const selected = versions.find((x) => x.id === v) ?? versions.find((x) => x.id === document.currentVersionId) ?? versions[0];
   if (!selected) return <UnavailableState className="min-h-64" title="Este documento ainda não tem versão publicada" />;
 
-  const [doc, options] = await Promise.all([getViewerDoc(ctx, selected.id), getVersionOptions(ctx, document.id), touchRecent(ctx.userId, { documentId: document.id })]);
+  const [doc, options, extractors, extractions] = await Promise.all([
+    getViewerDoc(ctx, selected.id),
+    getVersionOptions(ctx, document.id),
+    getExtractors(ctx),
+    getLatestExtractions(selected.id),
+    touchRecent(ctx.userId, { documentId: document.id }),
+  ]);
   if (!doc) notFound();
 
   const note =
@@ -49,6 +58,11 @@ export default async function ViewerPage({ params, searchParams }: { params: Pro
       doc={doc}
       options={options}
       processingNote={note}
+      ready={selected.stage === "DONE" && Boolean(selected.hasText)}
+      extractors={extractors}
+      extractions={extractions}
+      canExtract={can(role, "extraction.run")}
+      canAsk={can(role, "ai.ask")}
       versions={versions.map((x) => ({ id: x.id, label: vs(x.versionNumber), current: x.id === document.currentVersionId }))}
     />
   );
