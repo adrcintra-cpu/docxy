@@ -1,14 +1,15 @@
 /** Variáveis obrigatórias para o Docxy funcionar (só os nomes; nunca os valores). */
-export const REQUIRED_ENV = [
-  "NEXT_PUBLIC_SUPABASE_URL",
-  "NEXT_PUBLIC_SUPABASE_ANON_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "DATABASE_URL",
-  "DIRECT_URL",
-] as const;
+/** Cada item: nomes aceitos (qualquer um serve). */
+export const REQUIRED_ENV: string[][] = [
+  ["NEXT_PUBLIC_SUPABASE_URL"],
+  ["NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", "NEXT_PUBLIC_SUPABASE_ANON_KEY"],
+  ["SUPABASE_SECRET_KEY", "SUPABASE_SERVICE_ROLE_KEY"],
+  ["DATABASE_URL"],
+  ["DIRECT_URL"],
+];
 
 export function missingEnv(): string[] {
-  return REQUIRED_ENV.filter((k) => !process.env[k]);
+  return REQUIRED_ENV.filter((names) => !names.some((k) => process.env[k])).map((names) => names.join(" ou "));
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]!);

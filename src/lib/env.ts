@@ -15,7 +15,8 @@ const publicSchema = z.object({
 const building = process.env.NEXT_PHASE === "phase-production-build";
 const raw = {
   NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  // Aceita a chave pública nova (sb_publishable_…) ou a anon legada.
+  NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
   // Na Vercel, sem NEXT_PUBLIC_SITE_URL, usa o domínio de produção do projeto.
   NEXT_PUBLIC_SITE_URL:
     process.env.NEXT_PUBLIC_SITE_URL ||

@@ -11,6 +11,7 @@ const serverSchema = z.object({
 const building = process.env.NEXT_PHASE === "phase-production-build";
 export const serverEnv = serverSchema.parse({
   DATABASE_URL: process.env.DATABASE_URL || (building ? "postgresql://build/build" : undefined),
-  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || (building ? "build" : undefined),
+  // Aceita a chave secreta nova (sb_secret_…) ou a service_role legada.
+  SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY || (building ? "build" : undefined),
   AUDIT_IP_SALT: process.env.AUDIT_IP_SALT,
 });
