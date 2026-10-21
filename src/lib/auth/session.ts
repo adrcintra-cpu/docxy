@@ -56,7 +56,7 @@ export const getActiveMembership = cache(async (userId: string): Promise<ActiveM
     include: { organization: true },
     orderBy: { createdAt: "asc" },
   });
-  if (memberships.length === 0) return null;
+  if (memberships.length === 0) return bootstrapFirstAdmin(userId);
   const preferred = (await cookies()).get(ACTIVE_ORG_COOKIE)?.value;
   return memberships.find((m) => m.organizationId === preferred) ?? memberships[0] ?? null;
 });
@@ -79,4 +79,25 @@ export async function requirePermission(action: Action) {
     throw new ForbiddenError(action);
   }
   return { user, membership };
+}
+
+/**
+ * Primeiro acesso em produção, sem terminal: se ainda não existe nenhuma organização e o
+ * e-mail do usuário é BOOTSTRAP_ADMIN_EMAIL, cria a organização (BOOTSTRAP_ORG_NAME) e o
+ * torna administrador. Depois da primeira organização, nunca mais age.
+ */
+async function bootstrapFirstAdmin(userId: string): Promise<ActiveMembership | null> {
+  const email = process.env.BOOTSTRAP_ADMIN_EMAIL?.trim().toLowerCase();
+  if (!email) return null;
+  const user = await db.user.findUnique({ where: { id: userId }, select: { email: true } });
+  if (user?.email.toLowerCase() !== email) return null;
+  if ((await db.organization.count()) > 0) return null;
+  const name = process.env.BOOTSTRAP_ORG_NAME?.trim() || "Minha organização";
+  const slug = name.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/(^-|-$)/g, "") || "org";
+  const membership = await db.$transaction(async (tx) => {
+    const org = await tx.organization.create({ data: { name, slug } });
+    return tx.organizationMember.create({ data: { organizationId: org.id, userId, role: "ADMIN" }, include: { organization: true } });
+  });
+  await audit({ event: "org.bootstrap", result: "SUCCESS", userId, organizationId: membership.organizationId });
+  return membership;
 }

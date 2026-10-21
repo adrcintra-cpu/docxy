@@ -4,7 +4,7 @@ import { processQueue } from "@/lib/processing/run";
 
 /**
  * Processa a fila de leitura de documentos. Chamado por um agendador (ex.: Vercel Cron
- * a cada 5 minutos) com o cabeçalho  Authorization: Bearer <CRON_SECRET>.
+ * 1x por dia no plano gratuito da Vercel; o processamento normal roda logo após o upload) com o cabeçalho  Authorization: Bearer <CRON_SECRET>.
  * O upload já dispara o processamento na hora; isto cobre retentativas e travamentos.
  */
 export const maxDuration = 300;
