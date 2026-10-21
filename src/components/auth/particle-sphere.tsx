@@ -8,8 +8,10 @@ import { useEffect, useRef, useState } from "react";
  * Desempenho
  * - Canvas 2D, um único path por quadro; nº de pontos escala com a área e o DPR é limitado a 2.
  * - Pausa quando a aba fica oculta ou o elemento sai da tela.
- * - Modo estático (um quadro só) com prefers-reduced-motion, poucos núcleos/memória
- *   ou quando o quadro passa de ~32 ms repetidamente.
+ * - Qualidade adaptativa: se o quadro médio passar de ~40 ms (abaixo de 25 fps), a
+ *   densidade de pontos cai em degraus até 35%. A animação nunca é desligada por
+ *   desempenho; 30 fps (Safari em economia de bateria) é tratado como normal.
+ * - Modo estático (um quadro só) apenas com prefers-reduced-motion.
  * - Antes do JS carregar, o fallback CSS mostra um brilho azul no mesmo lugar.
  *
  * Interação: a esfera inclina na direção do cursor e os pontos próximos a ele
@@ -26,9 +28,11 @@ export function ParticleSphere({ className }: { className?: string }) {
     if (!ctx) return;
 
     const nav = navigator as Navigator & { deviceMemory?: number };
-    const lowPower = (nav.hardwareConcurrency ?? 8) < 2 || (nav.deviceMemory ?? 8) < 2;
+    const lowPower = (nav.hardwareConcurrency ?? 8) <= 2 || (nav.deviceMemory ?? 8) <= 2;
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    let animate = !reduced && !lowPower;
+    const animate = !reduced;
+    /** Fração da densidade máxima de pontos (1 = cheia). Aparelhos modestos começam mais leves. */
+    let quality = lowPower ? 0.6 : 1;
 
     let width = 0;
     let height = 0;
@@ -45,7 +49,8 @@ export function ParticleSphere({ className }: { className?: string }) {
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       // Distribuição de Fibonacci: pontos uniformes na esfera.
-      const count = Math.round(Math.min(9000, Math.max(2500, (width * height) / 55)));
+      const full = Math.min(9000, Math.max(2500, (width * height) / 55));
+      const count = Math.max(1200, Math.round(full * quality));
       points = new Float32Array(count * 3);
       const golden = Math.PI * (3 - Math.sqrt(5));
       for (let i = 0; i < count; i++) {
@@ -160,19 +165,24 @@ export function ParticleSphere({ className }: { className?: string }) {
 
     let raf = 0;
     let last = 0;
-    let slowFrames = 0;
+    let avgFrame = 16; // média móvel do intervalo entre quadros, em ms
+    let frames = 0;
     let visible = true;
 
     function loop(t: number) {
-      if (last && t - last > 32) slowFrames++;
-      else slowFrames = Math.max(0, slowFrames - 1);
+      const dt = last ? t - last : 16;
       last = t;
-      draw(t);
-      if (slowFrames > 30) {
-        animate = false; // dispositivo não acompanha: congela no quadro atual
-        return;
+      // Ignora pausas longas (troca de aba, janela em segundo plano).
+      if (dt < 250) avgFrame = avgFrame * 0.92 + dt * 0.08;
+      frames++;
+      // A cada ~1 s, se estiver abaixo de 25 fps, reduz a densidade em vez de parar.
+      if (frames % 60 === 0 && avgFrame > 40 && quality > 0.35) {
+        quality = Math.max(0.35, quality * 0.7);
+        build();
+        avgFrame = 16;
       }
-      if (animate && visible && !document.hidden) raf = requestAnimationFrame(loop);
+      draw(t);
+      if (visible && !document.hidden) raf = requestAnimationFrame(loop);
     }
 
     function start() {
