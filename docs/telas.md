@@ -1,6 +1,6 @@
 # Telas de referência
 
-Análise das 11 capturas, na ordem do fluxo. Todas as telas internas compartilham o mesmo esqueleto: **cabeçalho** (menu ☰, nome da organização "IRB(Re)", ícone de microfone desligado, logo, perfil, sino com ponto de notificação) e, abaixo, **barra de ferramentas** ou **área de trabalho** em painéis `surface` com `radius-lg`.
+Análise das 11 capturas, na ordem do fluxo. Todas as telas internas compartilham o mesmo esqueleto: **cabeçalho** (menu ☰, ícone de microfone desligado, logo, perfil, sino com ponto de notificação) e, abaixo, **barra de ferramentas** ou **área de trabalho** em painéis `surface` com `radius-lg`.
 
 ## 1. Login
 ![Login](referencias/01-login.jpg)
@@ -35,7 +35,7 @@ Dois visualizadores lado a lado: original à esquerda com trechos em `diff-remov
 ## 7. Comparação — extrator
 ![Extrator](referencias/07-comparacao-extrator.jpg)
 
-Painel **Extrator** com "Selecione extrator" e cards de campo: rótulo (Prêmio, Broker, Vigência), valor extraído (R$ 5.111.442,22; IRB-Brasil Resseguros S.A.; início/fim) e confiança (✓ 100%). Botão **EXTRAIR** em pílula branca no rodapé.
+Painel **Extrator** com "Selecione extrator" e cards de campo: rótulo (Prêmio, Broker, Vigência), valor extraído (R$ 5.111.442,22; nome da resseguradora; início/fim) e confiança (✓ 100%). Botão **EXTRAIR** em pílula branca no rodapé.
 
 ## 8. Comparação — métricas
 ![Métricas](referencias/08-comparacao-metricas.jpg)

@@ -33,7 +33,7 @@ Prisma lê `.env`, não `.env.local`: copie `DATABASE_URL` e `DIRECT_URL` també
 2. Entre em `/login` uma vez (isso cria seu registro em `users`).
 3. Crie a organização e torne-se administrador:
    ```bash
-   SEED_ADMIN_EMAIL=voce@empresa.com SEED_ORG_NAME="IRB(Re)" npm run db:seed
+   SEED_ADMIN_EMAIL=voce@empresa.com SEED_ORG_NAME="Minha Empresa" npm run db:seed
    ```
 
 ### Login social (opcional)

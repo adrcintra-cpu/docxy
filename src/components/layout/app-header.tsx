@@ -27,10 +27,6 @@ export function AppHeader({
       <label htmlFor="nav-toggle" className="cursor-pointer rounded-full p-2 text-ink-muted hover:text-ink" aria-label="Abrir menu">
         <Menu className="size-7" strokeWidth={1.5} />
       </label>
-      <Link href="/" className="truncate text-org font-semibold tracking-tight">
-        {organizationName}
-      </Link>
-
       <div className="ml-auto flex items-center gap-3 sm:gap-6">
         {/* Assistente de voz: ainda não disponível (estado identificado). */}
         <span title="Assistente de voz — disponível em fase futura" aria-label="Assistente de voz indisponível" className="hidden text-ink-subtle sm:inline-flex">

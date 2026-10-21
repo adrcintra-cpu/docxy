@@ -2,7 +2,7 @@
  * Seed de desenvolvimento: cria a organização inicial e torna ADMIN o usuário
  * indicado em SEED_ADMIN_EMAIL (que precisa já ter se cadastrado no Supabase Auth).
  *
- *   SEED_ADMIN_EMAIL=voce@empresa.com SEED_ORG_NAME="IRB(Re)" npm run db:seed
+ *   SEED_ADMIN_EMAIL=voce@empresa.com SEED_ORG_NAME="Minha Empresa" npm run db:seed
  *
  * Não cria documentos nem dados fictícios.
  */
