@@ -14,8 +14,9 @@ import { useEffect, useRef, useState } from "react";
  * - Modo estático (um quadro só) apenas com prefers-reduced-motion.
  * - Antes do JS carregar, o fallback CSS mostra um brilho azul no mesmo lugar.
  *
- * Interação: a esfera inclina na direção do cursor e os pontos próximos a ele
- * se afastam e acendem, com atraso suave. Funciona também com toque (arrastar).
+ * Visual: pontos ligados aos 3 vizinhos mais próximos por linhas finas (malha).
+ * Interação: a esfera inclina na direção do cursor e a superfície sob ele afunda
+ * para trás, com atraso suave. Funciona também com toque (arrastar).
  */
 export function ParticleSphere({ className }: { className?: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -38,6 +39,58 @@ export function ParticleSphere({ className }: { className?: string }) {
     let height = 0;
     let dpr = 1;
     let points: Float32Array = new Float32Array(0); // x, y, z por ponto (esfera unitária)
+    let links: Uint32Array = new Uint32Array(0); // pares (i, j) de vizinhos ligados por linha
+    let screen: Float32Array = new Float32Array(0); // por ponto: x e y na tela, profundidade (0–1)
+
+    /** Liga cada ponto aos seus vizinhos mais próximos (hash espacial 3D, O(n)). */
+    function buildLinks(count: number) {
+      const NEIGHBORS = 3;
+      const cell = Math.sqrt((4 * Math.PI) / count) * 1.6;
+      const cells = Math.ceil(2 / cell) + 1;
+      const key = (x: number, y: number, z: number) =>
+        (Math.floor((x + 1) / cell) * cells + Math.floor((y + 1) / cell)) * cells + Math.floor((z + 1) / cell);
+      const grid = new Map<number, number[]>();
+      for (let i = 0; i < count; i++) {
+        const k = key(points[i * 3]!, points[i * 3 + 1]!, points[i * 3 + 2]!);
+        const list = grid.get(k);
+        if (list) list.push(i);
+        else grid.set(k, [i]);
+      }
+      const pairs = new Set<number>();
+      const out: number[] = [];
+      const best: [number, number][] = [];
+      for (let i = 0; i < count; i++) {
+        const x = points[i * 3]!;
+        const y = points[i * 3 + 1]!;
+        const z = points[i * 3 + 2]!;
+        const gx = Math.floor((x + 1) / cell);
+        const gy = Math.floor((y + 1) / cell);
+        const gz = Math.floor((z + 1) / cell);
+        best.length = 0;
+        for (let ax = -1; ax <= 1; ax++)
+          for (let ay = -1; ay <= 1; ay++)
+            for (let az = -1; az <= 1; az++) {
+              const list = grid.get(((gx + ax) * cells + gy + ay) * cells + gz + az);
+              if (!list) continue;
+              for (const j of list) {
+                if (j === i) continue;
+                const dx = points[j * 3]! - x;
+                const dy = points[j * 3 + 1]! - y;
+                const dz = points[j * 3 + 2]! - z;
+                best.push([dx * dx + dy * dy + dz * dz, j]);
+              }
+            }
+        best.sort((m, n) => m[0] - n[0]);
+        for (let k = 0; k < Math.min(NEIGHBORS, best.length); k++) {
+          const j = best[k]![1];
+          const id = i < j ? i * count + j : j * count + i;
+          if (pairs.has(id)) continue;
+          pairs.add(id);
+          out.push(i, j);
+        }
+      }
+      links = Uint32Array.from(out);
+    }
 
     function build() {
       const rect = canvas!.getBoundingClientRect();
@@ -49,9 +102,10 @@ export function ParticleSphere({ className }: { className?: string }) {
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       // Distribuição de Fibonacci: pontos uniformes na esfera.
-      const full = Math.min(9000, Math.max(2500, (width * height) / 55));
-      const count = Math.max(1200, Math.round(full * quality));
+      const full = Math.min(8100, Math.max(2250, (width * height) / 61));
+      const count = Math.max(1100, Math.round(full * quality));
       points = new Float32Array(count * 3);
+      screen = new Float32Array(count * 3);
       const golden = Math.PI * (3 - Math.sqrt(5));
       for (let i = 0; i < count; i++) {
         const y = 1 - (i / (count - 1)) * 2;
@@ -61,6 +115,7 @@ export function ParticleSphere({ className }: { className?: string }) {
         points[i * 3 + 1] = y;
         points[i * 3 + 2] = Math.sin(theta) * r;
       }
+      buildLinks(count);
     }
 
     // Interação com o ponteiro: posição bruta + valores suavizados a cada quadro.
@@ -97,6 +152,8 @@ export function ParticleSphere({ className }: { className?: string }) {
       const tw = t * 0.0006;
       const reach = radius * 0.5;
       const reach2 = reach * reach;
+      // Perspectiva leve: o que está atrás fica um pouco menor e mais perto do centro.
+      const persp = (z: number) => 1 + z * 0.12;
 
       // Halo suave na borda (rim light).
       const halo = c.createRadialGradient(cx, cy, radius * 0.82, cx, cy, radius * 1.12);
@@ -108,46 +165,72 @@ export function ParticleSphere({ className }: { className?: string }) {
 
       // Agrupa por brilho em 4 faixas: poucas trocas de fillStyle.
       const bands: number[][] = [[], [], [], []];
-      for (let i = 0; i < points.length; i += 3) {
-        const px = points[i]!;
-        const py = points[i + 1]!;
-        const pz = points[i + 2]!;
+      const n = points.length / 3;
+      for (let i = 0; i < n; i++) {
+        const px = points[i * 3]!;
+        const py = points[i * 3 + 1]!;
+        const pz = points[i * 3 + 2]!;
         // Deformação orgânica: ondas sobre a superfície.
-        const wobble =
+        let wobble =
           1 +
           0.07 * Math.sin(3 * px + tw) * Math.cos(2 * py - tw * 0.8) +
           0.05 * Math.sin(4 * pz + py * 2 + tw * 1.3);
-        const x = (px * cosR - pz * sinR) * wobble;
-        const z0 = (px * sinR + pz * cosR) * wobble;
-        const y0 = py * wobble;
-        const y = y0 * cosT - z0 * sinT;
-        const z = y0 * sinT + z0 * cosT;
-        const depth = (z + 1.1) / 2.2; // 0 (fundo) … 1 (frente)
-        // Borda mais brilhante (efeito de rim light das referências).
-        const rim = Math.min(1, Math.pow(Math.hypot(x, y), 4) * 1.5);
-        let light = depth * 0.75 + rim * 0.7;
-        let size = 1 + depth * 1.5 + rim * 0.6;
-        let sx = cx + x * radius;
-        let sy = cy + y * radius;
+        let x = (px * cosR - pz * sinR) * wobble;
+        let z0 = (px * sinR + pz * cosR) * wobble;
+        let y0 = py * wobble;
+        let y = y0 * cosT - z0 * sinT;
+        let z = y0 * sinT + z0 * cosT;
+        let dent = 0;
 
-        // Perto do cursor, os pontos da face visível se afastam e acendem.
+        // Perto do cursor, a superfície visível afunda para dentro (amassado suave).
         if (focus > 0.01 && z > -0.15) {
-          const dx = sx - focusX;
-          const dy = sy - focusY;
+          const p = persp(z);
+          const dx = cx + x * radius * p - focusX;
+          const dy = cy + y * radius * p - focusY;
           const d2 = dx * dx + dy * dy;
           if (d2 < reach2) {
-            const d = Math.sqrt(d2) || 1;
-            const f = (1 - d / reach) ** 2 * focus;
-            const push = f * radius * 0.22;
-            sx += (dx / d) * push;
-            sy += (dy / d) * push;
-            light += f * 1.3;
-            size += f * 2.4;
+            const f = (1 - Math.sqrt(d2) / reach) ** 2 * focus;
+            const sink = 1 - f * 0.42 * Math.max(0, z); // empurra em direção ao centro
+            wobble *= sink;
+            x *= sink;
+            y *= sink;
+            z = z * sink - f * 0.7; // e para trás, longe do observador
+            dent = f;
           }
         }
 
+        const depth = Math.max(0, Math.min(1, (z + 1.1) / 2.2)); // 0 (fundo) … 1 (frente)
+        // Borda mais brilhante (efeito de rim light das referências).
+        const rim = Math.min(1, Math.pow(Math.hypot(x, y), 4) * 1.5);
+        // No fundo do amassado os pontos ficam menores e mais escuros, como se estivessem na sombra.
+        const light = (depth * 0.75 + rim * 0.7) * (1 - dent * 0.55);
+        const size = (0.9 + depth * 1.5 + rim * 0.6) * (1 - dent * 0.35);
+        const p = persp(z);
+        const sx = cx + x * radius * p;
+        const sy = cy + y * radius * p;
+        screen[i * 3] = sx;
+        screen[i * 3 + 1] = sy;
+        screen[i * 3 + 2] = depth;
+
         const band = Math.min(3, Math.floor(Math.min(1, light) * 4));
         bands[band]!.push(sx, sy, size);
+      }
+
+      // Linhas entre vizinhos: atrás quase invisíveis, na frente mais nítidas.
+      const lineBands: Path2D[] = [new Path2D(), new Path2D(), new Path2D()];
+      for (let k = 0; k < links.length; k += 2) {
+        const a = links[k]! * 3;
+        const b = links[k + 1]! * 3;
+        const d = (screen[a + 2]! + screen[b + 2]!) / 2;
+        const path = lineBands[d < 0.42 ? 0 : d < 0.68 ? 1 : 2]!;
+        path.moveTo(screen[a]!, screen[a + 1]!);
+        path.lineTo(screen[b]!, screen[b + 1]!);
+      }
+      c.lineWidth = 0.6;
+      const lineColors = ["rgba(80,125,205,0.07)", "rgba(110,155,235,0.16)", "rgba(160,200,255,0.3)"];
+      for (let l = 0; l < 3; l++) {
+        c.strokeStyle = lineColors[l]!;
+        c.stroke(lineBands[l]!);
       }
 
       const colors = ["rgba(60,105,190,0.35)", "rgba(90,145,230,0.6)", "rgba(140,190,255,0.85)", "rgba(215,232,255,1)"];
