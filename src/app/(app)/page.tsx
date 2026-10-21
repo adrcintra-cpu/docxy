@@ -32,7 +32,7 @@ export default async function DashboardPage({ searchParams }: { searchParams: Se
   return (
     <>
       {senha === "atualizada" && (
-        <p role="status" className="rounded-md bg-inserted/15 px-4 py-3 text-body-sm text-[#dbe58a]">
+        <p role="status" className="-my-3 rounded-md bg-inserted/15 px-3 py-1.5 text-label text-[#dbe58a]">
           Senha atualizada com sucesso.
         </p>
       )}
