@@ -5,6 +5,7 @@ import { NavDrawer } from "@/components/layout/nav-drawer";
 import { Logo } from "@/components/brand/logo";
 import { signOut } from "@/app/auth/actions";
 import { Button } from "@/components/ui/button";
+import { Toaster } from "@/components/ui/toast";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const user = await requireUser();
@@ -34,6 +35,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         unreadCount={unreadCount}
       />
       {children}
+      <Toaster />
     </div>
   );
 }

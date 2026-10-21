@@ -3,6 +3,7 @@ import { Bell, LogOut, Menu, User as UserIcon } from "lucide-react";
 import type { Notification, Role } from "@prisma/client";
 import { Logo } from "@/components/brand/logo";
 import { signOut } from "@/app/auth/actions";
+import { markAllNotificationsRead } from "@/app/actions/notifications";
 import { ROLE_LABEL } from "@/lib/auth/permissions";
 import { formatDate } from "@/lib/utils";
 
@@ -52,7 +53,16 @@ export function AppHeader({
             {unreadCount > 0 && <span className="absolute right-2 top-1.5 size-2.5 rounded-full bg-alert" />}
           </summary>
           <div className="absolute right-0 z-30 mt-4 w-80 rounded-md border border-line bg-overlay p-2 shadow-panel">
-            <p className="px-2 py-2 text-label text-ink-muted">Notificações</p>
+            <div className="flex items-center justify-between px-2 py-2">
+              <p className="text-label text-ink-muted">Notificações</p>
+              {unreadCount > 0 && (
+                <form action={markAllNotificationsRead}>
+                  <button type="submit" className="text-label text-accent-strong hover:underline">
+                    Marcar como lidas
+                  </button>
+                </form>
+              )}
+            </div>
             {notifications.length === 0 ? (
               <p className="px-2 py-6 text-center text-body-sm text-ink-muted">Nenhuma notificação por enquanto.</p>
             ) : (

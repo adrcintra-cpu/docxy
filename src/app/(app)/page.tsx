@@ -1,44 +1,33 @@
 import type { Metadata } from "next";
-import { FileText, Folder, LayoutGrid, List, Pin, Plus, Upload } from "lucide-react";
-import { requireUser, getActiveMembership } from "@/lib/auth/session";
-import { db } from "@/lib/db";
+import { getCtx } from "@/lib/access";
 import { can } from "@/lib/auth/permissions";
+import { getCreatableWorkspaces, getLibrary, getMoveTargets } from "@/lib/queries/library";
 import { getSidebarItems } from "@/lib/queries/sidebar";
+import { readLibraryParams, type SearchParams } from "@/lib/queries/params";
 import { Sidebar } from "@/components/layout/sidebar";
-import { SearchField } from "@/components/ui/search-field";
-import { IconButton } from "@/components/ui/icon-button";
-import { Button } from "@/components/ui/button";
-import { Card, UnavailableState } from "@/components/ui/card";
-import { formatBytes } from "@/lib/utils";
+import { UnavailableState } from "@/components/ui/card";
+import { LibraryFiltersBar, LibraryToolbar } from "@/components/documents/library-toolbar";
+import { DocumentCard, DocumentTable, FolderCard } from "@/components/documents/library-views";
+import { CreateFolderCard } from "@/components/documents/create-folder";
 
 export const metadata: Metadata = { title: "Documentos" };
 
-const PHASE_2 = "Disponível na Fase 2 — gestão de documentos";
+export default async function DashboardPage({ searchParams }: { searchParams: SearchParams }) {
+  const ctx = await getCtx();
+  const { view, filters } = await readLibraryParams(searchParams);
+  const senha = (await searchParams).senha;
 
-export default async function DashboardPage({ searchParams }: { searchParams: Promise<{ senha?: string }> }) {
-  const user = await requireUser();
-  const membership = (await getActiveMembership(user.id))!;
-  const { senha } = await searchParams;
-  const orgId = membership.organizationId;
-
-  const [sidebar, folders, documents] = await Promise.all([
-    getSidebarItems(user.id, orgId),
-    db.folder.findMany({
-      where: { organizationId: orgId, parentId: null, deletedAt: null },
-      orderBy: { updatedAt: "desc" },
-      take: 24,
-      select: { id: true, name: true, _count: { select: { documents: { where: { deletedAt: null } } } } },
-    }),
-    db.document.findMany({
-      where: { organizationId: orgId, folderId: null, deletedAt: null },
-      orderBy: { updatedAt: "desc" },
-      take: 24,
-      select: { id: true, title: true, currentVersion: { select: { sizeBytes: true, versionNumber: true } } },
-    }),
+  const [sidebar, library, moveTargets, workspaces] = await Promise.all([
+    getSidebarItems(ctx.userId, ctx.orgId),
+    getLibrary(ctx, filters),
+    getMoveTargets(ctx),
+    getCreatableWorkspaces(ctx),
   ]);
 
-  const canUpload = can(membership.role, "document.upload");
-  const isEmpty = folders.length === 0 && documents.length === 0;
+  const canCreateRoot = can(ctx.orgRole, "folder.create") || workspaces.length > 0;
+  const canUploadRoot = can(ctx.orgRole, "document.upload");
+  const total = library.folders.length + library.documents.length;
+  const filtering = Boolean(filters.q || filters.type || filters.pinned);
 
   return (
     <>
@@ -48,73 +37,62 @@ export default async function DashboardPage({ searchParams }: { searchParams: Pr
         </p>
       )}
 
-      {/* Barra de ferramentas (referência 02) */}
-      <section className="grid items-center gap-4 rounded-lg bg-surface p-4 shadow-panel sm:p-6 lg:grid-cols-[auto_1fr_auto_auto] lg:gap-8 lg:px-12">
-        <div className="flex items-center gap-8" role="tablist" aria-label="Modo de visualização">
-          <span role="tab" aria-selected className="flex items-center gap-2 text-body font-medium text-brand">
-            <LayoutGrid className="size-5" /> Em ícone
-          </span>
-          <span role="tab" aria-selected={false} aria-disabled title={PHASE_2} className="flex items-center gap-2 text-body text-ink-subtle">
-            <List className="size-5" /> Em lista
-          </span>
-        </div>
-        <SearchField className="min-w-0" disabledReason="Pesquisa global — disponível na Fase 2" />
-        <IconButton label={`Itens fixados — ${PHASE_2}`} tone="filled" disabled>
-          <Pin className="size-5" />
-        </IconButton>
-        <Button variant="primary" disabled title={canUpload ? PHASE_2 : "Seu perfil não permite enviar arquivos"}>
-          <Upload className="size-4" /> Upload arquivo
-        </Button>
-      </section>
+      <LibraryToolbar
+        base="/"
+        view={view}
+        filters={filters}
+        uploadDisabledReason={canUploadRoot ? undefined : "Seu perfil não permite enviar arquivos aqui. Envie dentro de uma pasta de um workspace."}
+      />
 
       <div className="grid flex-1 gap-6 lg:grid-cols-[320px_1fr]">
         <Sidebar pinned={sidebar.pinned} recent={sidebar.recent} />
 
-        <section aria-label="Pastas e documentos" className="grid auto-rows-min grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
-          <Card className="flex min-h-64 flex-col items-center justify-center gap-4 text-center text-ink-subtle" aria-disabled title={PHASE_2}>
-            <span className="flex size-24 items-center justify-center rounded-full border-2 border-line">
-              <Plus className="size-10" strokeWidth={1.25} />
-            </span>
-            <span className="text-body">Criar Pasta de Trabalho</span>
-            <span className="rounded-full bg-sunken px-3 py-1 text-label text-ink-muted">Fase 2</span>
-          </Card>
+        <section aria-label="Pastas e documentos" className="flex min-w-0 flex-col gap-5">
+          <LibraryFiltersBar base="/" view={view} filters={filters} total={total} />
 
-          {folders.map((f) => (
-            <Card key={f.id} className="flex min-h-64 flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <Folder className="size-6 text-brand" strokeWidth={1.5} />
-                <span className="truncate text-body font-medium">{f.name}</span>
+          {view === "lista" ? (
+            total > 0 ? (
+              <div className="rounded-lg bg-surface px-6 py-2">
+                <DocumentTable folders={library.folders} documents={library.documents} moveTargets={moveTargets} showFolder={Boolean(filters.q)} />
               </div>
-              <div className="flex flex-1 items-center justify-center rounded-sm bg-sunken text-body-sm text-ink-muted">
-                {f._count.documents} {f._count.documents === 1 ? "arquivo" : "arquivos"}
-              </div>
-            </Card>
-          ))}
-
-          {documents.map((d) => (
-            <Card key={d.id} className="flex min-h-64 flex-col gap-3">
-              <div className="flex items-center gap-3">
-                <FileText className="size-6 text-removed" strokeWidth={1.5} />
-                <span className="truncate text-body font-medium">{d.title}</span>
-              </div>
-              <div className="flex flex-1 items-center justify-center rounded-sm bg-sunken text-body-sm text-ink-muted">
-                {d.currentVersion
-                  ? `vs${String(d.currentVersion.versionNumber).padStart(2, "0")} · ${formatBytes(d.currentVersion.sizeBytes)}`
-                  : "Processando"}
-              </div>
-            </Card>
-          ))}
-
-          {isEmpty && (
-            <UnavailableState
-              className="col-span-full min-h-64"
-              phase="Fase 2"
-              title="Nenhum documento ainda"
-              description="O envio de arquivos, a criação de pastas e o versionamento chegam na próxima fase. Sua conta, organização e permissões já estão ativas."
-            />
+            ) : (
+              <Empty filtering={filtering} />
+            )
+          ) : (
+            <div className="grid auto-rows-min grid-cols-[repeat(auto-fill,minmax(240px,1fr))] gap-6">
+              {!filtering && (
+                <CreateFolderCard
+                  workspaces={workspaces}
+                  disabledReason={canCreateRoot ? undefined : "Seu perfil não permite criar pastas. Peça acesso a um workspace."}
+                />
+              )}
+              {library.folders.map((f) => (
+                <FolderCard key={f.id} folder={f} moveTargets={moveTargets} />
+              ))}
+              {library.documents.map((d) => (
+                <DocumentCard key={d.id} doc={d} moveTargets={moveTargets} />
+              ))}
+              {total === 0 && (
+                <div className="col-span-full">
+                  <Empty filtering={filtering} />
+                </div>
+              )}
+            </div>
           )}
         </section>
       </div>
     </>
+  );
+}
+
+function Empty({ filtering }: { filtering: boolean }) {
+  return filtering ? (
+    <UnavailableState className="min-h-64" title="Nada encontrado" description="Tente outro termo ou limpe os filtros." />
+  ) : (
+    <UnavailableState
+      className="min-h-64"
+      title="Nenhum documento ainda"
+      description="Crie uma pasta de trabalho ou envie arquivos PDF e DOCX. Você controla quem acessa cada pasta."
+    />
   );
 }

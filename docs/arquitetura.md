@@ -10,7 +10,7 @@ Navegador ──► Next.js (middleware) ──► Server Components / Server Ac
 ```
 
 - **Um único serviço Next.js** concentra interface e backend (Server Actions e Route Handlers). Módulos de domínio vivem em `src/lib/<módulo>` e podem ser extraídos para um serviço separado sem mudar a interface.
-- **Processamento pesado** (extração de texto, OCR, comparação, IA) será assíncrono a partir da Fase 2: o upload grava a versão com `stage = QUEUED` e um worker avança os estágios (`EXTRACTING_TEXT → OCR → INDEXING → DONE`). O estado aparece na interface.
+- **Processamento pesado** (extração de texto, OCR, comparação, IA) é assíncrono: desde a Fase 2 o upload grava a versão com `stage = QUEUED`, e a partir da Fase 3 um worker avança os estágios (`EXTRACTING_TEXT → OCR → INDEXING → DONE`). O estado aparece na interface.
 
 ## Autenticação
 
@@ -69,9 +69,37 @@ Decisões:
 | `NEXT_PUBLIC_AUTH_PROVIDERS` | público | provedores sociais exibidos |
 | `AUDIT_IP_SALT` | servidor (opcional) | anonimização de IP |
 
+## Documentos (Fase 2)
+
+### Quem vê o quê
+
+| Onde está o item | Quem acessa |
+| --- | --- |
+| Sem workspace ("Só eu") | quem criou, quem recebeu permissão ou compartilhamento, administradores |
+| Em um workspace ativo | todos os membros, com o perfil que têm no workspace |
+| Dentro de uma pasta | herda tudo o que vale para as pastas acima |
+
+O papel efetivo é o maior entre essas fontes (`src/lib/access.ts`). Workspaces desativados ("Habilitar grupo?" desligado) param de dar acesso imediatamente. Itens de outra organização respondem como inexistentes (404), sem revelar que existem.
+
+### Upload e versões
+
+1. `prepareUpload` valida extensão (PDF/DOCX), tipo e tamanho (até 100 MB), calcula duplicados pelo SHA-256 e cria a versão com `stage = UPLOADING`.
+2. O navegador envia o arquivo **direto** ao bucket privado por uma URL assinada de uso único, com barra de progresso.
+3. `finalizeUpload` baixa o objeto no servidor e confere tamanho, SHA-256 e assinatura do arquivo (`%PDF-` ou ZIP com `word/document.xml`). Só então a versão é publicada (`stage = QUEUED`, aguardando a leitura de texto da Fase 3). Falhas apagam o objeto e marcam a versão como `FAILED`.
+4. Arquivos são abertos ou baixados por `/api/versions/:id`, que verifica a permissão, registra a auditoria e redireciona para uma URL assinada de 60 s.
+
+Nova versão de um documento segue o mesmo fluxo; versões anteriores nunca são apagadas. Uploads abandonados são descartados por `abortUpload`.
+
+### Lixeira
+
+Excluir envia a pasta (com subpastas e documentos) para a lixeira marcando `deleted_at` com o mesmo instante; restaurar devolve exatamente esse conjunto. Se a pasta-mãe continua na lixeira, o item volta para o início. Não há exclusão definitiva pela interface.
+
+### Convites
+
+Convites guardam apenas o hash SHA-256 de um token de 32 bytes e expiram em 7 dias. Para quem ainda não tem conta, o Supabase envia o e-mail de convite; para quem já tem, o link é mostrado para ser copiado (o Supabase não envia e-mails avulsos). O aceite (`/convite/:token`) exige que o e-mail da conta seja o convidado.
+
 ## Próximas fases
 
-2. Documentos: upload, pastas, versionamento, lista, pesquisa, fixados/recentes, workspaces e convites.
-3. Visualizador e motor de comparação (pipeline determinístico), lista de mudanças e métricas.
+3. Visualizador e motor de comparação (pipeline determinístico), extração de texto/OCR, lista de mudanças e métricas.
 4. Extração inteligente, dashboard de comparação, assistente e resumos.
-5. Notificações, auditoria na interface, responsividade e endurecimento de segurança.
+5. Notificações completas, histórico/auditoria na interface, responsividade e endurecimento de segurança.

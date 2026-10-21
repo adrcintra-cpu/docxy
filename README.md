@@ -2,7 +2,7 @@
 
 Plataforma SaaS para gerenciar, ler, comparar e extrair informações de documentos — contratos, apólices, documentos jurídicos e financeiros.
 
-> **Estado atual: Fase 1 — Fundação.** Arquitetura, design system, banco de dados e autenticação. As funcionalidades das próximas fases aparecem na interface marcadas como indisponíveis (nunca como botões que não fazem nada). Plano completo em [`docs/brief.md`](docs/brief.md).
+> **Estado atual: Fase 2 — Documentos.** Além da fundação (design system, banco, autenticação), já funcionam pastas, upload com versionamento, pesquisa, fixados, recentes, compartilhamento, lixeira, workspaces e convites. As funções das próximas fases aparecem na interface marcadas como indisponíveis (nunca como botões que não fazem nada). Plano completo em [`docs/brief.md`](docs/brief.md).
 
 ## Stack
 
@@ -20,7 +20,7 @@ Pré-requisitos: Node 20+ e um projeto no [Supabase](https://supabase.com).
 ```bash
 npm install
 cp .env.example .env.local      # preencha com os dados do seu projeto Supabase
-npx prisma migrate dev --name init   # cria as tabelas
+npx prisma migrate dev --name init   # cria as tabelas (rode de novo a cada atualização do schema)
 npm run db:security              # RLS, trigger de usuários, auditoria imutável, bucket privado
 npm run dev                      # http://localhost:3000
 ```

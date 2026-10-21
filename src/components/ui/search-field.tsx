@@ -7,6 +7,8 @@ interface SearchFieldProps {
   defaultValue?: string;
   action?: string;
   className?: string;
+  /** Campos ocultos enviados junto (para manter filtros da URL). */
+  hidden?: Record<string, string | undefined>;
   /** Quando definido, a busca aparece desabilitada com este motivo (funcionalidade ainda não disponível). */
   disabledReason?: string;
 }
@@ -18,11 +20,13 @@ export function SearchField({
   defaultValue,
   action,
   className,
+  hidden,
   disabledReason,
 }: SearchFieldProps) {
   const disabled = Boolean(disabledReason);
   return (
     <form role="search" action={action} title={disabledReason} className={cn("relative flex h-12 items-center", disabled && "opacity-60", className)}>
+      {Object.entries(hidden ?? {}).map(([k, v]) => (v ? <input key={k} type="hidden" name={k} value={v} /> : null))}
       <input
         type="search"
         name={name}
@@ -30,6 +34,7 @@ export function SearchField({
         placeholder={placeholder}
         aria-label={placeholder}
         disabled={disabled}
+        maxLength={120}
         className="h-full w-full rounded-full bg-page pl-6 pr-16 text-body text-ink placeholder:text-ink-muted focus:outline-none focus:ring-2 focus:ring-brand/60"
       />
       <button

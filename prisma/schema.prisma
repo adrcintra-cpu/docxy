@@ -44,6 +44,8 @@ enum DocumentStatus {
 }
 
 enum ProcessingStage {
+  /// Registro criado; arquivo ainda sendo enviado ao Storage.
+  UPLOADING
   QUEUED
   EXTRACTING_TEXT
   OCR
@@ -326,7 +328,7 @@ model DocumentVersion {
   storagePath   String          @unique @map("storage_path")
   pageCount     Int?            @map("page_count")
   hasText       Boolean?        @map("has_text")
-  stage         ProcessingStage @default(QUEUED)
+  stage         ProcessingStage @default(UPLOADING)
   processingError String?       @map("processing_error")
   comment       String?
   uploadedById  String          @map("uploaded_by_id") @db.Uuid
