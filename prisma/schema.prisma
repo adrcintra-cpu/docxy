@@ -1,0 +1,637 @@
+// Docxy — modelo de dados relacional (Fase 1).
+//
+// Convenções
+// - IDs UUID gerados no banco; `users.id` é o mesmo UUID de `auth.users` (Supabase).
+// - Tabelas e colunas em snake_case (@@map / @map) para combinar com as políticas RLS.
+// - Históricos documentais NÃO são apagados em cascata: versões, comparações,
+//   extrações, comentários e auditoria usam onDelete: Restrict. Exclusão de
+//   pastas e documentos é lógica (deleted_at) para permitir lixeira e restauração.
+// - Todo dado pertence a uma organização (organization_id) para isolamento.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─── Enums ──────────────────────────────────────────────────────────────
+
+/// Perfis do brief: Administrador, Proprietário, Editor, Colaborador (escrita), Visualizador.
+enum Role {
+  ADMIN
+  OWNER
+  EDITOR
+  WRITER
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REVOKED
+  EXPIRED
+}
+
+enum DocumentStatus {
+  UPLOADING
+  PROCESSING
+  READY
+  FAILED
+}
+
+enum ProcessingStage {
+  QUEUED
+  EXTRACTING_TEXT
+  OCR
+  INDEXING
+  DONE
+  FAILED
+}
+
+enum ShareScope {
+  USER
+  WORKSPACE
+}
+
+enum ComparisonStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum ChangeType {
+  INSERTED
+  REMOVED
+  REPLACED
+  PARAGRAPH_CHANGED
+  CLAUSE_MODIFIED
+  NUMBER_CHANGED
+  DATE_CHANGED
+  MONEY_CHANGED
+  ENTITY_CHANGED
+  STRUCTURE_CHANGED
+  MOVED
+  FORMATTING
+}
+
+enum ReviewStatus {
+  PENDING
+  REVIEWED
+  DISMISSED
+}
+
+enum ExtractionStatus {
+  QUEUED
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum AIMessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+}
+
+enum NotificationType {
+  DOCUMENT_SHARED
+  NEW_VERSION
+  RELEVANT_CHANGE
+  WORKSPACE_INVITE
+  COMMENT
+  PROCESSING_DONE
+  PROCESSING_FAILED
+}
+
+enum AuditResult {
+  SUCCESS
+  FAILURE
+  DENIED
+}
+
+// ─── Identidade e organização ───────────────────────────────────────────
+
+model User {
+  /// Igual a auth.users.id (preenchido pelo trigger handle_new_user).
+  id         String    @id @db.Uuid
+  email      String    @unique
+  name       String?
+  avatarUrl  String?   @map("avatar_url")
+  createdAt  DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt  DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  lastSeenAt DateTime? @map("last_seen_at") @db.Timestamptz(6)
+
+  memberships          OrganizationMember[]
+  workspaceMemberships WorkspaceMember[]
+  invitationsSent      Invitation[]          @relation("InvitedBy")
+  foldersCreated       Folder[]              @relation("FolderCreatedBy")
+  documentsCreated     Document[]            @relation("DocumentCreatedBy")
+  versionsUploaded     DocumentVersion[]
+  permissions          DocumentPermission[]
+  sharesCreated        DocumentShare[]       @relation("ShareCreatedBy")
+  sharesReceived       DocumentShare[]       @relation("ShareTarget")
+  comparisons          Comparison[]
+  changesReviewed      ComparisonChange[]
+  extractorsCreated    Extractor[]
+  extractionResults    ExtractionResult[]
+  conversations        AIConversation[]
+  comments             Comment[]
+  notifications        Notification[]
+  auditLogs            AuditLog[]
+  pins                 Pin[]
+  recentItems          RecentItem[]
+
+  @@map("users")
+}
+
+model Organization {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name      String
+  slug      String    @unique
+  logoUrl   String?   @map("logo_url")
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  members       OrganizationMember[]
+  invitations   Invitation[]
+  workspaces    Workspace[]
+  folders       Folder[]
+  documents     Document[]
+  comparisons   Comparison[]
+  extractors    Extractor[]
+  conversations AIConversation[]
+  notifications Notification[]
+  auditLogs     AuditLog[]
+
+  @@map("organizations")
+}
+
+model OrganizationMember {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  userId         String   @map("user_id") @db.Uuid
+  role           Role     @default(VIEWER)
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_members")
+}
+
+model Invitation {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  workspaceId    String?          @map("workspace_id") @db.Uuid
+  email          String
+  role           Role             @default(VIEWER)
+  /// Hash SHA-256 do token enviado por e-mail (o token em si nunca é salvo).
+  tokenHash      String           @unique @map("token_hash")
+  status         InvitationStatus @default(PENDING)
+  invitedById    String           @map("invited_by_id") @db.Uuid
+  expiresAt      DateTime         @map("expires_at") @db.Timestamptz(6)
+  acceptedAt     DateTime?        @map("accepted_at") @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workspace    Workspace?   @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  invitedBy    User         @relation("InvitedBy", fields: [invitedById], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, email])
+  @@map("invitations")
+}
+
+// ─── Workspaces ─────────────────────────────────────────────────────────
+
+model Workspace {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  description    String?
+  /// "Habilitar grupo?" — desativado bloqueia o acesso dos membros.
+  active         Boolean   @default(true)
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization      @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  members      WorkspaceMember[]
+  folders      Folder[]
+  documents    Document[]
+  invitations  Invitation[]
+  shares       DocumentShare[]
+
+  @@unique([organizationId, name])
+  @@index([organizationId, active])
+  @@map("workspaces")
+}
+
+model WorkspaceMember {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  userId      String   @map("user_id") @db.Uuid
+  role        Role     @default(VIEWER)
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
+  @@map("workspace_members")
+}
+
+// ─── Pastas e documentos ────────────────────────────────────────────────
+
+model Folder {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  workspaceId    String?   @map("workspace_id") @db.Uuid
+  parentId       String?   @map("parent_id") @db.Uuid
+  name           String
+  description    String?
+  /// Pasta de trabalho (ícone amarelo Docxy) vs. pasta comum.
+  isWorkFolder   Boolean   @default(false) @map("is_work_folder")
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt      DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  organization Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workspace    Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  parent       Folder?              @relation("FolderTree", fields: [parentId], references: [id], onDelete: Restrict)
+  children     Folder[]             @relation("FolderTree")
+  createdBy    User                 @relation("FolderCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  documents    Document[]
+  permissions  DocumentPermission[]
+  shares       DocumentShare[]
+
+  @@index([organizationId, workspaceId, parentId])
+  @@index([organizationId, deletedAt])
+  @@map("folders")
+}
+
+model Document {
+  id               String         @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String         @map("organization_id") @db.Uuid
+  workspaceId      String?        @map("workspace_id") @db.Uuid
+  folderId         String?        @map("folder_id") @db.Uuid
+  title            String
+  description      String?
+  tags             String[]       @default([])
+  status           DocumentStatus @default(UPLOADING)
+  /// Versão exibida por padrão; atualizada a cada novo upload.
+  currentVersionId String?        @unique @map("current_version_id") @db.Uuid
+  createdById      String         @map("created_by_id") @db.Uuid
+  createdAt        DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt        DateTime?      @map("deleted_at") @db.Timestamptz(6)
+
+  organization   Organization         @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  workspace      Workspace?           @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  folder         Folder?              @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  createdBy      User                 @relation("DocumentCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  currentVersion DocumentVersion?     @relation("CurrentVersion", fields: [currentVersionId], references: [id], onDelete: Restrict)
+  versions       DocumentVersion[]    @relation("Versions")
+  permissions    DocumentPermission[]
+  shares         DocumentShare[]
+  comments       Comment[]
+
+  @@index([organizationId, folderId, deletedAt])
+  @@index([organizationId, workspaceId])
+  @@index([tags], type: Gin)
+  @@map("documents")
+}
+
+model DocumentVersion {
+  id            String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId    String          @map("document_id") @db.Uuid
+  /// 1, 2, 3… exibido como "vs01".
+  versionNumber Int             @map("version_number")
+  fileName      String          @map("file_name")
+  mimeType      String          @map("mime_type")
+  sizeBytes     BigInt          @map("size_bytes")
+  /// SHA-256 do arquivo: integridade e detecção de duplicados.
+  sha256        String
+  /// Caminho no bucket privado (nunca uma URL pública).
+  storagePath   String          @unique @map("storage_path")
+  pageCount     Int?            @map("page_count")
+  hasText       Boolean?        @map("has_text")
+  stage         ProcessingStage @default(QUEUED)
+  processingError String?       @map("processing_error")
+  comment       String?
+  uploadedById  String          @map("uploaded_by_id") @db.Uuid
+  createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  lastViewedAt  DateTime?       @map("last_viewed_at") @db.Timestamptz(6)
+
+  document          Document           @relation("Versions", fields: [documentId], references: [id], onDelete: Restrict)
+  currentOf         Document?          @relation("CurrentVersion")
+  uploadedBy        User               @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  comparisonsAsBase Comparison[]       @relation("BaseVersion")
+  comparisonsAsRev  Comparison[]       @relation("RevisedVersion")
+  extractions       ExtractionResult[]
+  comments          Comment[]
+
+  @@unique([documentId, versionNumber])
+  @@index([documentId, sha256])
+  @@map("document_versions")
+}
+
+/// Permissão explícita de um usuário sobre um documento ou pasta (Owner/Editor/Writer/Viewer).
+model DocumentPermission {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId String?  @map("document_id") @db.Uuid
+  folderId   String?  @map("folder_id") @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  role       Role
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document Document? @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  folder   Folder?   @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  user     User      @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@unique([documentId, userId])
+  @@unique([folderId, userId])
+  @@index([userId])
+  @@map("document_permissions")
+}
+
+/// Compartilhamento com um usuário ou um workspace inteiro, com expiração opcional.
+model DocumentShare {
+  id           String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  documentId   String?    @map("document_id") @db.Uuid
+  folderId     String?    @map("folder_id") @db.Uuid
+  scope        ShareScope
+  targetUserId String?    @map("target_user_id") @db.Uuid
+  workspaceId  String?    @map("workspace_id") @db.Uuid
+  role         Role       @default(VIEWER)
+  expiresAt    DateTime?  @map("expires_at") @db.Timestamptz(6)
+  revokedAt    DateTime?  @map("revoked_at") @db.Timestamptz(6)
+  createdById  String     @map("created_by_id") @db.Uuid
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  document   Document?  @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  folder     Folder?    @relation(fields: [folderId], references: [id], onDelete: Restrict)
+  targetUser User?      @relation("ShareTarget", fields: [targetUserId], references: [id], onDelete: Restrict)
+  workspace  Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Restrict)
+  createdBy  User       @relation("ShareCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([targetUserId])
+  @@index([workspaceId])
+  @@index([documentId])
+  @@map("document_shares")
+}
+
+/// Itens fixados (menu lateral "Fixados").
+model Pin {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String?  @map("document_id") @db.Uuid
+  folderId   String?  @map("folder_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@unique([userId, folderId])
+  @@map("pins")
+}
+
+/// Itens acessados recentemente (menu lateral "Recentes").
+model RecentItem {
+  id         String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId     String   @map("user_id") @db.Uuid
+  documentId String?  @map("document_id") @db.Uuid
+  folderId   String?  @map("folder_id") @db.Uuid
+  accessedAt DateTime @default(now()) @map("accessed_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, documentId])
+  @@unique([userId, folderId])
+  @@index([userId, accessedAt(sort: Desc)])
+  @@map("recent_items")
+}
+
+// ─── Comparação ─────────────────────────────────────────────────────────
+
+model Comparison {
+  id               String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String           @map("organization_id") @db.Uuid
+  baseVersionId    String           @map("base_version_id") @db.Uuid
+  revisedVersionId String           @map("revised_version_id") @db.Uuid
+  status           ComparisonStatus @default(QUEUED)
+  /// Versão do algoritmo, para resultados reprodutíveis.
+  engineVersion    String           @map("engine_version")
+  /// Métricas calculadas (inserções, remoções, palavras iguais…) + fórmula usada.
+  metrics          Json?
+  error            String?
+  requestedById    String           @map("requested_by_id") @db.Uuid
+  createdAt        DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt      DateTime?        @map("completed_at") @db.Timestamptz(6)
+
+  organization   Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  baseVersion    DocumentVersion    @relation("BaseVersion", fields: [baseVersionId], references: [id], onDelete: Restrict)
+  revisedVersion DocumentVersion    @relation("RevisedVersion", fields: [revisedVersionId], references: [id], onDelete: Restrict)
+  requestedBy    User               @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+  changes        ComparisonChange[]
+  comments       Comment[]
+
+  @@unique([baseVersionId, revisedVersionId, engineVersion])
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@map("comparisons")
+}
+
+model ComparisonChange {
+  id           String       @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  comparisonId String       @map("comparison_id") @db.Uuid
+  /// Ordem de leitura, para "anterior/próxima".
+  position     Int
+  type         ChangeType
+  /// Classificação enriquecida por IA (opcional); `type` vem do algoritmo determinístico.
+  aiLabel      String?      @map("ai_label")
+  relevant     Boolean      @default(false)
+  baseText     String?      @map("base_text")
+  revisedText  String?      @map("revised_text")
+  basePage     Int?         @map("base_page")
+  revisedPage  Int?         @map("revised_page")
+  /// Retângulos [{page,x,y,w,h}] normalizados (0–1) para destacar no visualizador.
+  baseRects    Json?        @map("base_rects")
+  revisedRects Json?        @map("revised_rects")
+  contextBefore String?     @map("context_before")
+  contextAfter  String?     @map("context_after")
+  reviewStatus ReviewStatus @default(PENDING) @map("review_status")
+  reviewedById String?      @map("reviewed_by_id") @db.Uuid
+  reviewedAt   DateTime?    @map("reviewed_at") @db.Timestamptz(6)
+
+  comparison Comparison @relation(fields: [comparisonId], references: [id], onDelete: Restrict)
+  reviewedBy User?      @relation(fields: [reviewedById], references: [id], onDelete: Restrict)
+  comments   Comment[]
+
+  @@unique([comparisonId, position])
+  @@index([comparisonId, type])
+  @@map("comparison_changes")
+}
+
+// ─── Extração ───────────────────────────────────────────────────────────
+
+model Extractor {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  name           String
+  /// contrato, apólice, jurídico, financeiro, proposta…
+  documentKind   String    @map("document_kind")
+  /// Campos esperados: [{key, label, type, required, hint}]
+  fields         Json
+  active         Boolean   @default(true)
+  createdById    String    @map("created_by_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization       @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  createdBy    User               @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  results      ExtractionResult[]
+
+  @@unique([organizationId, name])
+  @@map("extractors")
+}
+
+model ExtractionResult {
+  id          String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  extractorId String           @map("extractor_id") @db.Uuid
+  versionId   String           @map("version_id") @db.Uuid
+  status      ExtractionStatus @default(QUEUED)
+  /// [{key, value|null ("Não identificado"), confidence, page, rects, sourceText, corrected, correctedValue}]
+  values      Json?
+  error       String?
+  model       String?
+  requestedById String         @map("requested_by_id") @db.Uuid
+  createdAt   DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  completedAt DateTime?        @map("completed_at") @db.Timestamptz(6)
+
+  extractor   Extractor       @relation(fields: [extractorId], references: [id], onDelete: Restrict)
+  version     DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  requestedBy User            @relation(fields: [requestedById], references: [id], onDelete: Restrict)
+
+  @@index([versionId])
+  @@map("extraction_results")
+}
+
+// ─── Assistente de IA ───────────────────────────────────────────────────
+
+model AIConversation {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  userId         String    @map("user_id") @db.Uuid
+  title          String?
+  /// Versões de documento no contexto da conversa.
+  versionIds     String[]  @map("version_ids") @db.Uuid
+  comparisonId   String?   @map("comparison_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Restrict)
+  messages     AIMessage[]
+
+  @@index([organizationId, userId, updatedAt(sort: Desc)])
+  @@map("ai_conversations")
+}
+
+model AIMessage {
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  conversationId String        @map("conversation_id") @db.Uuid
+  role           AIMessageRole
+  content        String
+  /// Evidências: [{versionId, page, text, rects}]
+  citations      Json?
+  model          String?
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  conversation AIConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+  @@map("ai_messages")
+}
+
+// ─── Colaboração ────────────────────────────────────────────────────────
+
+model Comment {
+  id           String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  authorId     String    @map("author_id") @db.Uuid
+  documentId   String?   @map("document_id") @db.Uuid
+  versionId    String?   @map("version_id") @db.Uuid
+  comparisonId String?   @map("comparison_id") @db.Uuid
+  changeId     String?   @map("change_id") @db.Uuid
+  parentId     String?   @map("parent_id") @db.Uuid
+  body         String
+  page         Int?
+  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+  deletedAt    DateTime? @map("deleted_at") @db.Timestamptz(6)
+
+  author     User              @relation(fields: [authorId], references: [id], onDelete: Restrict)
+  document   Document?         @relation(fields: [documentId], references: [id], onDelete: Restrict)
+  version    DocumentVersion?  @relation(fields: [versionId], references: [id], onDelete: Restrict)
+  comparison Comparison?       @relation(fields: [comparisonId], references: [id], onDelete: Restrict)
+  change     ComparisonChange? @relation(fields: [changeId], references: [id], onDelete: Restrict)
+  parent     Comment?          @relation("Thread", fields: [parentId], references: [id], onDelete: Restrict)
+  replies    Comment[]         @relation("Thread")
+
+  @@index([documentId])
+  @@index([comparisonId])
+  @@map("comments")
+}
+
+model Notification {
+  id             String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String           @map("organization_id") @db.Uuid
+  userId         String           @map("user_id") @db.Uuid
+  type           NotificationType
+  title          String
+  body           String?
+  /// Link interno para abrir o item (ex.: /documentos/<id>).
+  href           String?
+  readAt         DateTime?        @map("read_at") @db.Timestamptz(6)
+  createdAt      DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, readAt, createdAt(sort: Desc)])
+  @@map("notifications")
+}
+
+/// Trilha de auditoria. Somente inserção; nunca guarda conteúdo de documentos.
+model AuditLog {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String?     @map("organization_id") @db.Uuid
+  userId         String?     @map("user_id") @db.Uuid
+  /// ex.: auth.sign_in, auth.sign_out, document.upload, document.view, comparison.run
+  event          String
+  documentId     String?     @map("document_id") @db.Uuid
+  versionId      String?     @map("version_id") @db.Uuid
+  result         AuditResult
+  /// Metadados não sensíveis (provedor, motivo de falha…).
+  metadata       Json?
+  ipHash         String?     @map("ip_hash")
+  userAgent      String?     @map("user_agent")
+  createdAt      DateTime    @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  organization Organization? @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, createdAt(sort: Desc)])
+  @@index([userId, createdAt(sort: Desc)])
+  @@index([documentId])
+  @@map("audit_logs")
+}

@@ -1,0 +1,111 @@
+@import "tailwindcss";
+
+/*
+ * Docxy design system — tokens.
+ * Valores medidos nas telas de referência; a paleta do brief está anotada
+ * em docs/design-system.md. Mantenha este arquivo como única fonte de cor.
+ */
+@theme {
+  /* Superfícies */
+  --color-page: #1f232e;
+  --color-login: #111722;
+  --color-surface: #2a3040;
+  --color-raised: #313747;
+  --color-overlay: #3d4457;
+  --color-sunken: #20242f;
+  --color-login-panel: #151b24;
+  --color-login-input: #1a202c;
+  --color-login-primary: #192946;
+  --color-paper: #ffffff;
+  --color-line: #4d576d;
+
+  /* Texto */
+  --color-ink: #ffffff;
+  --color-ink-muted: #98a1b8;
+  --color-ink-subtle: #6d7894;
+  --color-ink-disabled: #727988;
+  --color-on-light: #1f232e;
+
+  /* Marca e interação */
+  --color-brand: #f7ec5c;
+  --color-logo: #f9ed32;
+  --color-accent: #3471e3;
+  --color-accent-strong: #5b8ff0; /* variante 4.5:1+ para texto pequeno sobre painéis escuros */
+  --color-chart: #5cc8f6;
+
+  /* Significado fixo */
+  --color-removed: #dc3a37;
+  --color-inserted: #bcca40;
+  --color-chip: #b5bccf;
+  --color-toggle: #5bb235;
+  --color-alert: #e74850;
+
+  /* Avatares */
+  --color-avatar-lime: #bcca40;
+  --color-avatar-purple: #7915c3;
+  --color-avatar-orange: #f09137;
+  --color-avatar-red: #dc3a37;
+
+  /* Tipografia */
+  --font-sans: var(--font-montserrat), "Gotham", system-ui, sans-serif;
+  --text-label: 12px;
+  --text-label--line-height: 16px;
+  --text-body-sm: 13px;
+  --text-body-sm--line-height: 18px;
+  --text-body: 15px;
+  --text-body--line-height: 22px;
+  --text-title: 18px;
+  --text-title--line-height: 24px;
+  --text-org: 28px;
+  --text-org--line-height: 32px;
+  --tracking-caps: 0.2em;
+
+  /* Raios */
+  --radius-sm: 8px;
+  --radius-md: 16px;
+  --radius-lg: 24px;
+
+  /* Sombras suaves */
+  --shadow-panel: 0 12px 32px -12px rgb(0 0 0 / 0.45);
+
+  /* Movimento */
+  --ease-out-soft: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+  body {
+    background: var(--color-page);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: color-mix(in srgb, var(--color-brand) 40%, transparent);
+  }
+  :focus-visible {
+    outline: 2px solid var(--color-brand);
+    outline-offset: 2px;
+  }
+}
+
+@layer utilities {
+  /* Grade de "+" usada nos estados vazios do dashboard */
+  .plus-field {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='32' height='32'%3E%3Cpath d='M12 16h8M16 12v8' stroke='%236d7894' stroke-width='1.5' fill='none'/%3E%3C/svg%3E");
+    background-size: 32px 32px;
+    mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+    opacity: 0.35;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
