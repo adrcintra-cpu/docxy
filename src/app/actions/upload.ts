@@ -2,6 +2,7 @@
 
 import { createHash, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { audit } from "@/lib/audit";
@@ -11,6 +12,7 @@ import { ForbiddenError } from "@/lib/auth/session";
 import { guard, ok } from "@/lib/actions";
 import { NotFoundError, UserError, type ActionResult } from "@/lib/errors";
 import { documentVisibleWhere, getCtx, requireDocument, requireFolder } from "@/lib/access";
+import { processVersion } from "@/lib/processing/run";
 import {
   ALLOWED_TYPES,
   MAX_UPLOAD_BYTES,
@@ -178,7 +180,7 @@ export async function finalizeUpload(versionId: string): Promise<ActionResult<{ 
       db.documentVersion.update({
         where: { id: version.id },
         data: {
-          // Extração de texto, OCR e indexação entram na Fase 3; a versão fica na fila.
+          // Vai para a fila de leitura (texto, OCR, indexação), disparada logo abaixo.
           stage: "QUEUED",
           pageCount: ext === "pdf" ? estimatePdfPages(bytes) : null,
         },
@@ -209,6 +211,9 @@ export async function finalizeUpload(versionId: string): Promise<ActionResult<{ 
       });
     }
 
+    // Lê o documento depois de responder ao usuário; o cron /api/jobs/process cobre falhas.
+    after(() => processVersion(version.id));
+
     revalidatePath("/", "layout");
     return ok({ documentId: version.documentId }, isNewVersion ? "Nova versão publicada." : "Arquivo enviado.");
   });
@@ -228,5 +233,22 @@ export async function abortUpload(versionId: string): Promise<ActionResult> {
     });
     revalidatePath("/", "layout");
     return ok();
+  });
+}
+
+/** Coloca de novo na fila uma versão cuja leitura falhou. */
+export async function retryProcessing(versionId: string): Promise<ActionResult> {
+  return guard(async () => {
+    const ctx = await getCtx();
+    const version = await db.documentVersion.findFirst({
+      where: { id: z.string().uuid().parse(versionId), stage: "FAILED", document: { organizationId: ctx.orgId } },
+      select: { id: true, documentId: true },
+    });
+    if (!version) throw new NotFoundError("Versão");
+    await requireDocument(ctx, version.documentId, "document.upload");
+    await db.documentVersion.update({ where: { id: version.id }, data: { stage: "QUEUED", processingError: null } });
+    after(() => processVersion(version.id));
+    revalidatePath(`/documentos/${version.documentId}`);
+    return ok(undefined, "Leitura reiniciada.");
   });
 }

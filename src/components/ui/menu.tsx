@@ -52,7 +52,7 @@ export function ItemMenu({ items, label = "Ações", className }: { items: MenuI
         <MoreVertical className="size-5" />
       </button>
       {open && (
-        <ul role="menu" className="absolute right-0 z-30 mt-1 min-w-48 rounded-md border border-line bg-overlay p-1 shadow-panel">
+        <ul role="menu" className="animate-pop absolute right-0 z-30 mt-1 min-w-48 rounded-md border border-line bg-overlay p-1 shadow-panel">
           {items.map(({ label: itemLabel, icon: Icon, onSelect, danger, disabled, hint }) => (
             <li key={itemLabel} role="none">
               <button

@@ -54,7 +54,7 @@ function Row({ item }: { item: SidebarItem }) {
   const Icon = item.kind === "folder" ? Folder : FileText;
   return (
     <li>
-      <Link href={item.href} className="flex items-start gap-3 rounded-sm px-2 py-2 hover:bg-sunken">
+      <Link href={item.href} className="flex items-start gap-3 rounded-sm px-2 py-2 hover:translate-x-0.5 hover:bg-sunken [&:hover_svg]:text-brand">
         <Icon className="mt-0.5 size-5 shrink-0 text-ink-muted" strokeWidth={1.5} />
         <span className="min-w-0">
           <span className="block truncate text-body-sm">{item.name}</span>

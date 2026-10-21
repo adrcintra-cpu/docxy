@@ -98,8 +98,38 @@ Excluir envia a pasta (com subpastas e documentos) para a lixeira marcando `dele
 
 Convites guardam apenas o hash SHA-256 de um token de 32 bytes e expiram em 7 dias. Para quem ainda não tem conta, o Supabase envia o e-mail de convite; para quem já tem, o link é mostrado para ser copiado (o Supabase não envia e-mails avulsos). O aceite (`/convite/:token`) exige que o e-mail da conta seja o convidado.
 
+## Leitura e comparação (Fase 3)
+
+### Leitura de texto
+
+Depois do upload, `processVersion` (`src/lib/processing/run.ts`) roda em segundo plano (`after()` do Next) e avança `QUEUED → EXTRACTING_TEXT → OCR → INDEXING → DONE`:
+
+- **PDF:** PDF.js (build legacy, no Node) extrai cada fragmento com posição; `layout.ts` monta palavras, linhas e parágrafos com caixas normalizadas (0–1).
+- **DOCX:** `word/document.xml` lido com JSZip (parágrafos, quebras, tabulações; revisões excluídas são ignoradas). Sem coordenadas: o visualizador mostra o texto refluído em páginas de ~450 palavras.
+- **OCR:** páginas sem texto passam pelo Tesseract quando `OCR_ENABLED=true` (pacotes opcionais `tesseract.js` e `@napi-rs/canvas`). Sem OCR, a versão fica marcada como "sem texto extraível".
+- O texto vai para `version_pages` (palavras + texto corrido, usado também na pesquisa por conteúdo). `/api/jobs/process` (cron, `CRON_SECRET`) reprocessa a fila e destrava leituras paradas.
+
+### Motor de comparação (`src/lib/compare`)
+
+Determinístico e versionado (`ENGINE_VERSION`), sem IA:
+
+1. **Normalização controlada** — Unicode, aspas/travessões tipográficos, ligaduras e espaços invisíveis; números, datas, pontuação e maiúsculas preservados.
+2. **Segmentação** — páginas → parágrafos → palavras; hifenização no fim da linha é desfeita.
+3. **Alinhamento** — diff de Myers sobre parágrafos; parágrafos parecidos (Dice ≥ 0,45) são emparelhados em ordem.
+4. **Diferenças** — diff de Myers sobre palavras dentro de cada par.
+5. **Movidos** — parágrafo removido num lugar e inserido idêntico em outro vira `MOVED`, não remoção + inserção.
+6. **Classificação** — valores (`MONEY_CHANGED`), datas, números (inclusive por extenso), nomes/entidades, cláusulas, parágrafo reescrito (> 50%), formatação (só caixa/acentos/pontuação).
+7. **Coordenadas** — retângulos por linha a partir das caixas das palavras, gravados com a alteração.
+8. **Métricas** — `percentual = (inseridas + removidas + substituídas) ÷ (iguais + inseridas + removidas + substituídas) × 100`; movidos e formatação contam como iguais.
+
+Os testes (`npm test`) cobrem o diff, a classificação e uma comparação de PDFs reais (`tests/fixtures`).
+
+### Telas
+
+- `/documentos/:id/ver` — visualizador (PDF.js com camada de destaques; DOCX em texto), páginas, zoom, ajustar à largura/página, pesquisa, tela cheia, download e troca de versão.
+- `/comparar/:id` — original × revisado com rolagem sincronizada pelas alterações, mapa de diferenças, lista de mudanças (filtros, revisada/ignorada, comentários, anterior/próxima), métricas e exportação em CSV (`/api/comparacoes/:id/relatorio`).
+
 ## Próximas fases
 
-3. Visualizador e motor de comparação (pipeline determinístico), extração de texto/OCR, lista de mudanças e métricas.
 4. Extração inteligente, dashboard de comparação, assistente e resumos.
 5. Notificações completas, histórico/auditoria na interface, responsividade e endurecimento de segurança.

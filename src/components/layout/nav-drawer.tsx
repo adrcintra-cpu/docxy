@@ -18,7 +18,7 @@ interface MenuItem {
 
 const ITEMS: MenuItem[] = [
   { label: "Abrir", icon: FileUp, action: "document.read", href: "/" },
-  { label: "Salvar", icon: Save, action: "document.upload", phase: "Fase 3" },
+  { label: "Salvar", icon: Save, action: "document.upload", phase: "Fase 4" },
   { label: "Extrator", icon: SquareArrowOutUpRight, action: "extraction.run", phase: "Fase 4" },
   { label: "Compartilhar", icon: Share2, action: "document.read", href: "/compartilhados" },
   { label: "Histórico", icon: History, action: "document.read", phase: "Fase 5" },
@@ -68,7 +68,7 @@ export function NavDrawer({ role }: { role: Role }) {
                 <Link
                   href={href}
                   onClick={closeMenu}
-                  className="flex items-center gap-3 rounded-sm px-1 py-1.5 text-[13px] leading-[17px] text-[#c9ceda] transition-colors hover:text-ink [&:hover_svg]:text-brand"
+                  className="flex items-center gap-3 rounded-sm px-1 py-1.5 text-[13px] leading-[17px] text-[#c9ceda] transition-colors hover:translate-x-0.5 hover:bg-white/[.03] hover:text-ink [&:hover_svg]:text-brand"
                 >
                   <Icon className="size-5 shrink-0 text-ink-muted transition-colors" strokeWidth={1.4} />
                   {label}

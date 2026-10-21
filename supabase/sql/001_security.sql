@@ -15,7 +15,7 @@ declare t text;
 begin
   foreach t in array array[
     'users','organizations','organization_members','invitations',
-    'workspaces','workspace_members','folders','documents','document_versions',
+    'workspaces','workspace_members','folders','documents','document_versions','version_pages',
     'document_permissions','document_shares','pins','recent_items',
     'comparisons','comparison_changes','extractors','extraction_results',
     'ai_conversations','ai_messages','comments','notifications','audit_logs'

@@ -53,7 +53,7 @@ export function AvatarStack({
   const rest = people.length - shown.length;
   return (
     <div className="flex items-center">
-      <div className="flex -space-x-3">
+      <div className="stack-hover flex -space-x-3">
         {shown.map((p) => (
           <Avatar key={p.id} id={p.id} name={p.name} size={size} />
         ))}

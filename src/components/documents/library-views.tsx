@@ -46,7 +46,7 @@ export function FolderCard({ folder, moveTargets }: { folder: FolderItem; moveTa
 
   if (folder.isWorkFolder) {
     return (
-      <article className="relative flex min-h-64 flex-col rounded-md bg-surface p-5 transition-colors hover:bg-[#30374a]">
+      <article className="lift hover:bg-[#30374a] hover:bg-[#30374a] relative flex min-h-64 flex-col rounded-md bg-surface p-5">
         <div className="flex items-start justify-between">
           <Pin className={cn("size-5", folder.pinned ? "fill-brand text-brand" : "text-ink-subtle")} strokeWidth={1.5} aria-label={folder.pinned ? "Fixada" : undefined} />
           <div className="relative z-10">{actions}</div>
@@ -69,7 +69,7 @@ export function FolderCard({ folder, moveTargets }: { folder: FolderItem; moveTa
   }
 
   return (
-    <article className="relative flex min-h-64 flex-col gap-3 rounded-md bg-surface p-3">
+    <article className="lift hover:bg-[#30374a] hover:bg-[#30374a] relative flex min-h-64 flex-col gap-3 rounded-md bg-surface p-3">
       <div className="flex items-center gap-3 px-1">
         <Folder className="size-6 shrink-0 text-brand" strokeWidth={1.5} />
         <Link href={`/pastas/${folder.id}`} className="min-w-0 flex-1 truncate text-body font-medium hover:underline">
@@ -95,7 +95,7 @@ export function FolderCard({ folder, moveTargets }: { folder: FolderItem; moveTa
 
 export function DocumentCard({ doc, moveTargets }: { doc: DocumentItem; moveTargets: FolderOption[] }) {
   return (
-    <article className="relative flex min-h-64 flex-col gap-3 rounded-md bg-surface p-3">
+    <article className="lift hover:bg-[#30374a] hover:bg-[#30374a] relative flex min-h-64 flex-col gap-3 rounded-md bg-surface p-3">
       <div className="flex items-center gap-3 px-1">
         <FileIcon ext={doc.ext} />
         <Link href={`/documentos/${doc.id}`} className="min-w-0 flex-1 truncate text-body font-medium hover:underline">
@@ -104,7 +104,7 @@ export function DocumentCard({ doc, moveTargets }: { doc: DocumentItem; moveTarg
         <ItemActions kind="document" id={doc.id} name={doc.title} pinned={doc.pinned} permissions={doc.permissions} moveTargets={moveTargets} currentParentId={doc.folderId} downloadVersionId={doc.versionId} />
       </div>
       {/* Miniatura da primeira página chega com o visualizador (Fase 3). */}
-      <Link href={`/documentos/${doc.id}`} className="flex flex-1 flex-col justify-between rounded-sm bg-paper p-4 text-on-light">
+      <Link href={`/documentos/${doc.id}/ver`} aria-label={`Abrir ${doc.title} no visualizador`} className="flex flex-1 flex-col justify-between rounded-sm bg-paper p-4 text-on-light transition-shadow hover:shadow-[0_0_0_2px_var(--color-brand)]">
         <div className="flex flex-col gap-1.5" aria-hidden>
           {[92, 78, 85, 64, 88, 70].map((w, i) => (
             <span key={i} className="h-1.5 rounded-full bg-on-light/15" style={{ width: `${w}%` }} />
@@ -136,7 +136,7 @@ export function DocumentTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[860px] border-collapse text-left">
+      <table className="rows-hover w-full min-w-[860px] border-collapse text-left">
         <thead>
           <tr className="border-b border-line/70 text-body-sm text-ink-muted">
             <th className="py-3 pr-4 font-normal">Arquivo</th>

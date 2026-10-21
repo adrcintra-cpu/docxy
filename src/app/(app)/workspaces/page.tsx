@@ -61,7 +61,7 @@ export default async function WorkspacesPage({ searchParams }: { searchParams: S
         />
       ) : (
         <div className="overflow-x-auto">
-          <table className="mx-auto w-full min-w-[820px] max-w-[1400px] border-separate border-spacing-y-2 text-left">
+          <table className="mx-auto w-full min-w-[820px] max-w-[1400px] border-separate border-spacing-y-2 text-left [&_tbody_tr]:transition-transform [&_tbody_tr:hover]:-translate-y-px [&_tbody_tr:hover_td]:bg-[#30374a]">
             <thead>
               <tr className="text-label text-ink-muted">
                 <th className="px-6 py-2 font-medium">Nome</th>

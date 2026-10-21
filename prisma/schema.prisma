@@ -330,6 +330,7 @@ model DocumentVersion {
   hasText       Boolean?        @map("has_text")
   stage         ProcessingStage @default(UPLOADING)
   processingError String?       @map("processing_error")
+  processingStartedAt DateTime? @map("processing_started_at") @db.Timestamptz(6)
   comment       String?
   uploadedById  String          @map("uploaded_by_id") @db.Uuid
   createdAt     DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -338,6 +339,7 @@ model DocumentVersion {
   document          Document           @relation("Versions", fields: [documentId], references: [id], onDelete: Restrict)
   currentOf         Document?          @relation("CurrentVersion")
   uploadedBy        User               @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  pages             VersionPage[]
   comparisonsAsBase Comparison[]       @relation("BaseVersion")
   comparisonsAsRev  Comparison[]       @relation("RevisedVersion")
   extractions       ExtractionResult[]
@@ -346,6 +348,25 @@ model DocumentVersion {
   @@unique([documentId, versionNumber])
   @@index([documentId, sha256])
   @@map("document_versions")
+}
+
+/// Texto extraído por página (PDF.js, DOCX ou OCR). `words` = [{t,x,y,w,h,lb?,pb?}] com caixas normalizadas 0–1.
+model VersionPage {
+  id         String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  versionId  String  @map("version_id") @db.Uuid
+  pageNumber Int     @map("page_number")
+  /// Tamanho da página em pontos (0 para DOCX, que não tem paginação fixa).
+  width      Float
+  height     Float
+  /// Texto corrido da página, para pesquisa.
+  text       String
+  words      Json
+  ocr        Boolean @default(false)
+
+  version DocumentVersion @relation(fields: [versionId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, pageNumber])
+  @@map("version_pages")
 }
 
 /// Permissão explícita de um usuário sobre um documento ou pasta (Owner/Editor/Writer/Viewer).

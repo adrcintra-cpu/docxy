@@ -14,7 +14,8 @@
     "db:deploy": "prisma migrate deploy",
     "db:security": "prisma db execute --schema prisma/schema.prisma --file supabase/sql/001_security.sql",
     "db:studio": "prisma studio",
-    "db:seed": "tsx prisma/seed.ts"
+    "db:seed": "tsx prisma/seed.ts",
+    "test": "tsx --test tests/*.test.ts"
   },
   "dependencies": {
     "@prisma/client": "6.16.2",
@@ -22,8 +23,10 @@
     "@supabase/supabase-js": "2.57.4",
     "class-variance-authority": "0.7.1",
     "clsx": "2.1.1",
+    "jszip": "3.10.1",
     "lucide-react": "0.544.0",
     "next": "15.5.4",
+    "pdfjs-dist": "6.2.108",
     "react": "19.1.1",
     "react-dom": "19.1.1",
     "server-only": "0.0.1",
@@ -45,5 +48,9 @@
   },
   "prisma": {
     "seed": "tsx prisma/seed.ts"
+  },
+  "optionalDependencies": {
+    "@napi-rs/canvas": "0.1.77",
+    "tesseract.js": "6.0.1"
   }
 }

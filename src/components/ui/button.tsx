@@ -10,9 +10,9 @@ const buttonVariants = cva(
       variant: {
         /** Pílula branca, caixa-alta espaçada — UPLOAD ARQUIVO, EXTRAIR, CRIAR WORKSPACE. */
         primary:
-          "bg-paper text-on-light uppercase tracking-caps text-label hover:bg-chip disabled:bg-ink-disabled disabled:text-surface",
+          "bg-paper text-on-light uppercase tracking-caps text-label hover:bg-chip hover:shadow-[0_6px_18px_-8px_rgba(255,255,255,.35)] disabled:bg-ink-disabled disabled:text-surface",
         /** Amarelo Docxy — ação principal de destaque. */
-        brand: "bg-brand text-on-light uppercase tracking-caps text-label hover:brightness-95",
+        brand: "bg-brand text-on-light uppercase tracking-caps text-label hover:brightness-95 hover:shadow-[0_6px_18px_-8px_rgba(247,236,92,.55)]",
         /** Botão ENTRAR do login. */
         login:
           "bg-login-primary text-accent-strong uppercase tracking-caps text-label hover:bg-[#21365c] disabled:text-ink-disabled",

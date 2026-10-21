@@ -2,7 +2,7 @@
 
 Plataforma SaaS para gerenciar, ler, comparar e extrair informações de documentos — contratos, apólices, documentos jurídicos e financeiros.
 
-> **Estado atual: Fase 2 — Documentos.** Além da fundação (design system, banco, autenticação), já funcionam pastas, upload com versionamento, pesquisa, fixados, recentes, compartilhamento, lixeira, workspaces e convites. As funções das próximas fases aparecem na interface marcadas como indisponíveis (nunca como botões que não fazem nada). Plano completo em [`docs/brief.md`](docs/brief.md).
+> **Estado atual: Fase 3 — Leitura e comparação.** Além da fundação e dos documentos (pastas, upload, versões, compartilhamento, workspaces), já funcionam a leitura de texto (PDF, DOCX e OCR opcional), o visualizador, o motor de comparação, a lista de mudanças com revisão e comentários, o mapa de diferenças e as métricas. As funções das próximas fases aparecem na interface marcadas como indisponíveis (nunca como botões que não fazem nada). Plano completo em [`docs/brief.md`](docs/brief.md).
 
 ## Stack
 
@@ -23,6 +23,7 @@ cp .env.example .env.local      # preencha com os dados do seu projeto Supabase
 npx prisma migrate dev --name init   # cria as tabelas (rode de novo a cada atualização do schema)
 npm run db:security              # RLS, trigger de usuários, auditoria imutável, bucket privado
 npm run dev                      # http://localhost:3000
+npm test                         # testes do motor de comparação e da leitura de PDF/DOCX
 ```
 
 Prisma lê `.env`, não `.env.local`: copie `DATABASE_URL` e `DIRECT_URL` também para um `.env` (ambos estão no `.gitignore`).

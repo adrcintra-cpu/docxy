@@ -3,7 +3,8 @@ import { createServerClient } from "@supabase/ssr";
 import { REMEMBER_COOKIE, applyRemember } from "./cookies";
 
 /** Rotas acessíveis sem sessão. */
-const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/auth/callback", "/auth/confirm"];
+/** /api/jobs se autentica com CRON_SECRET, não com sessão. */
+const PUBLIC_PATHS = ["/login", "/esqueci-senha", "/auth/callback", "/auth/confirm", "/api/jobs"];
 /** Rotas que um usuário já logado não deve ver. */
 const GUEST_ONLY = ["/login", "/esqueci-senha"];
 

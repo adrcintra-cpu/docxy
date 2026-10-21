@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { ChevronRight, Download, ExternalLink, FileSearch, GitCompareArrows, Undo2 } from "lucide-react";
+import { ChevronRight, Download, Eye, FileSearch, Undo2 } from "lucide-react";
 import { getCtx, requireDocument } from "@/lib/access";
 import { can } from "@/lib/auth/permissions";
 import { db } from "@/lib/db";
@@ -15,11 +15,14 @@ import { ItemActions } from "@/components/documents/item-actions";
 import { FileIcon } from "@/components/documents/library-views";
 import { UploadButton } from "@/components/documents/upload-dialog";
 import { StatusChip } from "@/components/ui/status-chip";
+import { CompareButton } from "@/components/compare/compare-dialog";
+import { RetryProcessingButton } from "@/components/documents/retry-button";
+import { getVersionOptions } from "@/lib/queries/compare";
 
 export const metadata: Metadata = { title: "Documento" };
 
 const STAGE: Record<string, { label: string; tone: "neutral" | "changed" | "removed" | "info" }> = {
-  QUEUED: { label: "Aguardando leitura", tone: "neutral" },
+  QUEUED: { label: "Na fila de leitura", tone: "neutral" },
   EXTRACTING_TEXT: { label: "Lendo texto", tone: "info" },
   OCR: { label: "OCR", tone: "info" },
   INDEXING: { label: "Indexando", tone: "info" },
@@ -39,7 +42,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
   }
   const { document, role } = access;
 
-  const [versions, share, moveTargets, trail, owner, pin] = await Promise.all([
+  const [versions, share, moveTargets, trail, owner, pin, compareOptions] = await Promise.all([
     db.documentVersion.findMany({
       where: { documentId: document.id, stage: { not: "UPLOADING" } },
       orderBy: { versionNumber: "desc" },
@@ -50,6 +53,7 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
     getBreadcrumb(ctx.orgId, document.folderId),
     db.user.findUnique({ where: { id: document.createdById }, select: { id: true, name: true, email: true } }),
     db.pin.findFirst({ where: { userId: ctx.userId, documentId: document.id }, select: { id: true } }),
+    getVersionOptions(ctx, document.id),
     touchRecent(ctx.userId, { documentId: document.id }),
   ]);
   const workspace = document.workspaceId ? await db.workspace.findUnique({ where: { id: document.workspaceId }, select: { name: true } }) : null;
@@ -69,11 +73,10 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
-          <span title="A comparação de versões chega na Fase 3" className="inline-flex">
-            <button type="button" disabled className="inline-flex h-11 items-center gap-2 rounded-full px-5 text-body-sm text-ink-subtle">
-              <GitCompareArrows className="size-4" /> Comparar versões <span className="rounded-full bg-sunken px-2 py-0.5 text-label">Fase 3</span>
-            </button>
-          </span>
+          <Link href={`/documentos/${document.id}/ver`} className="inline-flex h-11 items-center gap-2 rounded-full bg-brand px-5 text-label font-semibold uppercase tracking-caps text-on-light hover:brightness-95">
+            <Eye className="size-4" /> Abrir
+          </Link>
+          <CompareButton options={compareOptions} disabledReason={compareOptions.filter((o) => !o.notReady).length < 2 ? "É preciso ter duas versões já lidas para comparar." : undefined} />
           <UploadButton
             documentId={document.id}
             label="Nova versão"
@@ -190,23 +193,22 @@ export default async function DocumentPage({ params }: { params: Promise<{ id: s
                       <td className="px-4 text-center">{formatDate(v.createdAt)}</td>
                       <td className="px-4 text-center">{formatDate(v.lastViewedAt)}</td>
                       <td className="px-4 text-center">
-                        <span title={v.processingError ?? (v.stage === "QUEUED" ? "Leitura do texto e OCR chegam na Fase 3" : undefined)}>
-                          <StatusChip tone={stage.tone}>{stage.label}</StatusChip>
+                        <span title={v.processingError ?? undefined} className="inline-flex flex-col items-center gap-1">
+                          <StatusChip tone={v.stage === "DONE" && !v.hasText ? "removed" : stage.tone}>{v.stage === "DONE" && !v.hasText ? "Sem texto" : stage.label}</StatusChip>
+                          {v.stage === "FAILED" && can(role, "document.upload") && <RetryProcessingButton versionId={v.id} />}
                         </span>
                       </td>
                       <td className="pl-4">
                         {usable && (
                           <div className="flex justify-center gap-1">
-                            <a
-                              href={`/api/versions/${v.id}`}
-                              target="_blank"
-                              rel="noopener"
-                              aria-label={`Abrir vs${String(v.versionNumber).padStart(2, "0")}`}
-                              title="Abrir em nova aba"
+                            <Link
+                              href={`/documentos/${document.id}/ver?v=${v.id}`}
+                              aria-label={`Abrir vs${String(v.versionNumber).padStart(2, "0")} no visualizador`}
+                              title="Abrir no visualizador"
                               className="flex size-8 items-center justify-center rounded-full text-ink-muted hover:bg-sunken hover:text-ink"
                             >
-                              <ExternalLink className="size-4" />
-                            </a>
+                              <Eye className="size-4" />
+                            </Link>
                             {canDownload && (
                               <a
                                 href={`/api/versions/${v.id}?download=1`}

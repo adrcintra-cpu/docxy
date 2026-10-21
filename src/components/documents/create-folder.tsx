@@ -34,7 +34,7 @@ export function CreateFolderCard({
         title={disabledReason}
         onClick={() => setOpen(true)}
         className={cn(
-          "group flex min-h-64 flex-col items-center justify-center gap-4 rounded-md bg-surface p-4 text-center transition-colors hover:bg-[#30374a] disabled:cursor-not-allowed disabled:opacity-60",
+          "lift hover:bg-[#30374a] group flex min-h-64 flex-col items-center justify-center gap-4 rounded-md bg-surface p-4 text-center disabled:cursor-not-allowed disabled:opacity-60",
           className,
         )}
       >

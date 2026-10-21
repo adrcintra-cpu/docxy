@@ -11,6 +11,8 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   reactStrictMode: true,
+  // Leitura de PDF/OCR roda no Node, fora do bundle.
+  serverExternalPackages: ["pdfjs-dist", "@napi-rs/canvas", "tesseract.js"],
   experimental: {
     serverActions: { bodySizeLimit: "2mb" },
   },

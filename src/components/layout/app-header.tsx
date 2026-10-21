@@ -25,23 +25,23 @@ export function AppHeader({
 }) {
   return (
     <header className="flex h-16 items-center gap-4 rounded-lg border border-[#3b4459] bg-[linear-gradient(180deg,rgba(74,86,110,.5)_0%,rgba(40,48,66,.5)_100%)] px-4 shadow-[0_8px_20px_-6px_rgba(0,0,0,.35)] backdrop-blur-md sm:h-20 sm:px-8">
-      <label htmlFor="nav-toggle" className="cursor-pointer rounded-full p-2 text-ink-muted hover:text-ink" aria-label="Abrir menu">
+      <label htmlFor="nav-toggle" className="cursor-pointer rounded-full p-2 text-ink-muted hover:bg-white/5 hover:text-ink" aria-label="Abrir menu">
         <Menu className="size-[22px]" strokeWidth={1.5} />
       </label>
       <div className="ml-auto flex items-center gap-3 sm:gap-6">
         <Logo className="hidden h-6 sm:block" />
 
         <details className="group relative">
-          <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full bg-page text-ink hover:ring-2 hover:ring-line" aria-label="Perfil">
+          <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full bg-page text-ink hover:ring-2 hover:ring-brand/60" aria-label="Perfil">
             <UserIcon className="size-5" strokeWidth={1.5} />
           </summary>
-          <div className="absolute right-0 z-30 mt-4 w-[210px] rounded-lg border border-line/70 bg-page p-4 shadow-[0_24px_60px_-16px_rgba(0,0,0,.65)]">
+          <div className="animate-pop absolute right-0 z-30 mt-4 w-[210px] rounded-lg border border-line/70 bg-page p-4 shadow-[0_24px_60px_-16px_rgba(0,0,0,.65)]">
             <p className="truncate text-[11px] font-semibold leading-4">{userName}</p>
             <p className="truncate text-[11px] leading-4 text-ink-muted">{userEmail}</p>
             <p className="mt-1.5 text-[10px] leading-[14px] text-ink-muted">{ROLE_LABEL[role]} · {organizationName}</p>
             <form action={signOut} className="mt-3 border-t border-line/70 pt-2">
               <button type="submit" className="flex w-full items-center gap-3 rounded-sm px-1 py-1.5 text-[13px] leading-[17px] text-[#c9ceda] transition-colors hover:text-ink [&:hover_svg]:text-brand">
-                <LogOut className="size-5 shrink-0 text-ink-muted transition-colors" strokeWidth=1.4 /> Sair
+                <LogOut className="size-5 shrink-0 text-ink-muted transition-colors" strokeWidth={1.4} /> Sair
               </button>
             </form>
           </div>
@@ -52,7 +52,7 @@ export function AppHeader({
             <Bell className="size-[22px]" strokeWidth={1.5} />
             {unreadCount > 0 && <span className="absolute right-2 top-1.5 size-2.5 rounded-full bg-alert" />}
           </summary>
-          <div className="absolute right-0 z-30 mt-4 w-[230px] rounded-lg border border-line/70 bg-page p-3 shadow-[0_24px_60px_-16px_rgba(0,0,0,.65)]">
+          <div className="animate-pop absolute right-0 z-30 mt-4 w-[230px] rounded-lg border border-line/70 bg-page p-3 shadow-[0_24px_60px_-16px_rgba(0,0,0,.65)]">
             <div className="flex items-center justify-between px-1 pb-2">
               <p className="text-[11px] font-semibold leading-4">Notificações</p>
               {unreadCount > 0 && (

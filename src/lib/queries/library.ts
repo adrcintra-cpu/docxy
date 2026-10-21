@@ -222,7 +222,15 @@ export async function getLibrary(ctx: Ctx, filters: LibraryFilters) {
       documentVisibleWhere(ctx),
       { deletedAt: null, status: { not: "UPLOADING" } },
       searching
-        ? { OR: [{ title: { contains: q, mode: "insensitive" } }, { tags: { has: q!.toLowerCase() } }, { description: { contains: q, mode: "insensitive" } }] }
+        ? {
+            OR: [
+              { title: { contains: q, mode: "insensitive" } },
+              { tags: { has: q!.toLowerCase() } },
+              { description: { contains: q, mode: "insensitive" } },
+              // Conteúdo: texto extraído da versão atual (Fase 3).
+              { currentVersion: { pages: { some: { text: { contains: q, mode: "insensitive" } } } } },
+            ],
+          }
         : { folderId: null },
       filters.pinned ? { id: { in: [...pins.documents] } } : {},
       filters.type ? { currentVersion: { fileName: { endsWith: `.${filters.type}`, mode: "insensitive" } } } : {},
