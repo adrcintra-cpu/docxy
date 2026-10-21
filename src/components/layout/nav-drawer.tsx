@@ -1,51 +1,72 @@
-import Link from "next/link";
-import { FolderKanban, LayoutGrid, ShieldCheck, Users, X } from "lucide-react";
-import { can } from "@/lib/auth/permissions";
+import { FileUp, History, Save, Share2, SquareArrowOutUpRight, Users, X } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import type { Role } from "@prisma/client";
+import { can, type Action } from "@/lib/auth/permissions";
 
-const NAV = [
-  { href: "/", label: "Documentos", icon: LayoutGrid, show: () => true },
-  { href: "/workspaces", label: "Workspaces", icon: Users, show: (r: Role) => can(r, "workspace.manage") || can(r, "document.read"), phase: "Fase 2" },
-  { href: "/comparacoes", label: "Comparações", icon: FolderKanban, show: () => true, phase: "Fase 3" },
-  { href: "/auditoria", label: "Auditoria", icon: ShieldCheck, show: (r: Role) => can(r, "org.audit.read"), phase: "Fase 5" },
+interface MenuItem {
+  label: string;
+  icon: LucideIcon;
+  /** Permissão necessária; sem ela o item nem aparece. */
+  action: Action;
+  /** Fase em que a função chega. Enquanto houver fase, o item aparece como indisponível. */
+  phase?: string;
+  href?: string;
+}
+
+const ITEMS: MenuItem[] = [
+  { label: "Abrir", icon: FileUp, action: "document.read", phase: "Fase 2" },
+  { label: "Salvar", icon: Save, action: "document.upload", phase: "Fase 2" },
+  { label: "Extrator", icon: SquareArrowOutUpRight, action: "extraction.run", phase: "Fase 4" },
+  { label: "Compartilhar", icon: Share2, action: "document.share", phase: "Fase 2" },
+  { label: "Histórico", icon: History, action: "document.read", phase: "Fase 2" },
+  { label: "Workspace", icon: Users, action: "document.read", phase: "Fase 2" },
 ];
 
 /**
- * Menu ☰ sem JavaScript: o checkbox #nav-toggle (acionado pelo cabeçalho) abre a gaveta.
- * Itens de fases futuras aparecem marcados como indisponíveis, nunca como links quebrados.
+ * Menu ☰ (referência de menu com overlay): painel flutuante ancorado abaixo do botão,
+ * com o resto da tela escurecido. Funciona sem JavaScript: o checkbox #nav-toggle
+ * (acionado pelo cabeçalho) abre e fecha; clicar no overlay também fecha.
+ * Funções de fases futuras aparecem marcadas como indisponíveis, nunca como links quebrados.
  */
 export function NavDrawer({ role }: { role: Role }) {
+  const items = ITEMS.filter((item) => can(role, item.action));
   return (
     <>
       <input id="nav-toggle" type="checkbox" className="peer sr-only" aria-hidden />
-      <label htmlFor="nav-toggle" className="fixed inset-0 z-40 hidden bg-black/50 peer-checked:block" aria-hidden />
+      <label
+        htmlFor="nav-toggle"
+        aria-hidden
+        className="pointer-events-none fixed inset-0 z-40 bg-black/55 opacity-0 backdrop-blur-[2px] transition-opacity duration-200 peer-checked:pointer-events-auto peer-checked:opacity-100"
+      />
       <nav
-        aria-label="Navegação principal"
-        className="fixed inset-y-0 left-0 z-50 w-72 -translate-x-full bg-overlay p-6 shadow-panel transition-transform duration-300 ease-out-soft peer-checked:translate-x-0"
+        aria-label="Menu"
+        className="pointer-events-none fixed left-3 top-[calc(env(safe-area-inset-top,0px)+64px)] z-50 w-[min(300px,calc(100vw-24px))] origin-top-left -translate-y-2 scale-[0.98] rounded-lg border border-line/70 bg-page p-6 opacity-0 shadow-[0_24px_60px_-16px_rgba(0,0,0,.65)] transition duration-200 ease-out-soft peer-checked:pointer-events-auto peer-checked:translate-y-0 peer-checked:scale-100 peer-checked:opacity-100 sm:left-8 sm:top-[calc(env(safe-area-inset-top,0px)+84px)]"
       >
-        <div className="mb-8 flex items-center justify-between">
-          <span className="text-label text-ink-muted">Menu</span>
-          <label htmlFor="nav-toggle" className="cursor-pointer rounded-full p-1 text-ink-muted hover:text-ink" aria-label="Fechar menu">
-            <X className="size-5" />
+        <div className="mb-6 flex items-center justify-between">
+          <span className="text-body font-semibold">Menu</span>
+          <label
+            htmlFor="nav-toggle"
+            className="-mr-1 cursor-pointer rounded-full p-1 text-ink-muted transition-colors hover:text-ink"
+            aria-label="Fechar menu"
+          >
+            <X className="size-7" strokeWidth={1.5} />
           </label>
         </div>
-        <ul className="flex flex-col gap-1">
-          {NAV.filter((n) => n.show(role)).map(({ href, label, icon: Icon, phase }) =>
-            phase ? (
-              <li key={href} className="flex items-center gap-3 rounded-sm px-3 py-3 text-body text-ink-subtle" aria-disabled>
-                <Icon className="size-5" strokeWidth={1.5} />
-                {label}
+        <ul className="flex flex-col gap-2">
+          {items.map(({ label, icon: Icon, phase }) => (
+            <li
+              key={label}
+              aria-disabled={phase ? true : undefined}
+              title={phase ? `${label} — disponível na ${phase}` : undefined}
+              className="flex items-center gap-4 rounded-sm px-1 py-2.5 text-title text-[#c9ceda]"
+            >
+              <Icon className="size-7 shrink-0 text-ink-muted" strokeWidth={1.4} />
+              <span className={phase ? "opacity-70" : undefined}>{label}</span>
+              {phase && (
                 <span className="ml-auto rounded-full bg-surface px-2 py-0.5 text-label text-ink-muted">{phase}</span>
-              </li>
-            ) : (
-              <li key={href}>
-                <Link href={href} className="flex items-center gap-3 rounded-sm px-3 py-3 text-body hover:bg-surface">
-                  <Icon className="size-5" strokeWidth={1.5} />
-                  {label}
-                </Link>
-              </li>
-            ),
-          )}
+              )}
+            </li>
+          ))}
         </ul>
       </nav>
     </>
