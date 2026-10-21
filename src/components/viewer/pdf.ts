@@ -9,7 +9,8 @@ const cache = new Map<string, Promise<PDFDocumentProxy>>();
 export function pdfjs() {
   if (!lib) {
     lib = import("pdfjs-dist").then((m) => {
-      m.GlobalWorkerOptions.workerSrc = new URL("pdfjs-dist/build/pdf.worker.min.mjs", import.meta.url).toString();
+      // Copiado de pdfjs-dist para public/ no postinstall (scripts/copy-pdf-worker.mjs).
+      m.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.mjs";
       return m;
     });
   }

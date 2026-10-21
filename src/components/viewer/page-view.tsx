@@ -104,7 +104,8 @@ function PdfPage({
         const c = canvas.current;
         c.width = Math.floor(viewport.width);
         c.height = Math.floor(viewport.height);
-        const render = p.render({ canvas: c, viewport });
+        // canvasContext (PDF.js 4) + canvas (versões novas): funciona nas duas.
+        const render = p.render({ canvasContext: c.getContext("2d")!, canvas: c, viewport } as Parameters<typeof p.render>[0]);
         task = render;
         await render.promise;
       } catch (err) {

@@ -2,6 +2,7 @@
 # Build na Vercel. Com o banco configurado, cria/atualiza as tabelas e aplica a segurança;
 # sem ele (primeiro deploy, antes de ligar o Supabase), só compila.
 set -euo pipefail
+node scripts/copy-pdf-worker.mjs
 npx prisma generate
 if [ -n "${DATABASE_URL:-}" ] && [ -n "${DIRECT_URL:-}" ]; then
   npx prisma db push --skip-generate

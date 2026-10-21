@@ -13,3 +13,6 @@ next-env.d.ts
 .DS_Store
 npm-debug.log*
 .vercel
+
+# gerado no postinstall
+public/pdf.worker.min.mjs
