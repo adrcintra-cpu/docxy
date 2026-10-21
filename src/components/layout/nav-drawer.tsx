@@ -49,28 +49,28 @@ export function NavDrawer({ role }: { role: Role }) {
       />
       <nav
         aria-label="Menu"
-        className="pointer-events-none fixed left-3 top-[calc(env(safe-area-inset-top,0px)+64px)] z-50 w-[min(300px,calc(100vw-24px))] origin-top-left -translate-y-2 scale-[0.98] rounded-lg border border-line/70 bg-page p-6 opacity-0 shadow-[0_24px_60px_-16px_rgba(0,0,0,.65)] transition duration-200 ease-out-soft peer-checked:pointer-events-auto peer-checked:translate-y-0 peer-checked:scale-100 peer-checked:opacity-100 sm:left-8 sm:top-[calc(env(safe-area-inset-top,0px)+84px)]"
+        className="pointer-events-none fixed left-3 top-[calc(env(safe-area-inset-top,0px)+64px)] z-50 w-[min(210px,calc(100vw-24px))] origin-top-left -translate-y-2 scale-[0.98] rounded-lg border border-line/70 bg-page p-4 opacity-0 shadow-[0_24px_60px_-16px_rgba(0,0,0,.65)] transition duration-200 ease-out-soft peer-checked:pointer-events-auto peer-checked:translate-y-0 peer-checked:scale-100 peer-checked:opacity-100 sm:left-8 sm:top-[calc(env(safe-area-inset-top,0px)+84px)]"
       >
-        <div className="mb-6 flex items-center justify-between">
-          <span className="text-body font-semibold">Menu</span>
+        <div className="mb-4 flex items-center justify-between">
+          <span className="text-[11px] font-semibold leading-4">Menu</span>
           <label
             htmlFor="nav-toggle"
             className="-mr-1 cursor-pointer rounded-full p-1 text-ink-muted transition-colors hover:text-ink"
             aria-label="Fechar menu"
           >
-            <X className="size-7" strokeWidth={1.5} />
+            <X className="size-5" strokeWidth={1.5} />
           </label>
         </div>
-        <ul className="flex flex-col gap-2">
+        <ul className="flex flex-col gap-1">
           {items.map(({ label, icon: Icon, phase, href }) =>
             href && !phase ? (
               <li key={label}>
                 <Link
                   href={href}
                   onClick={closeMenu}
-                  className="flex items-center gap-4 rounded-sm px-1 py-2.5 text-title text-[#c9ceda] transition-colors hover:text-ink [&:hover_svg]:text-brand"
+                  className="flex items-center gap-3 rounded-sm px-1 py-1.5 text-[13px] leading-[17px] text-[#c9ceda] transition-colors hover:text-ink [&:hover_svg]:text-brand"
                 >
-                  <Icon className="size-7 shrink-0 text-ink-muted transition-colors" strokeWidth={1.4} />
+                  <Icon className="size-5 shrink-0 text-ink-muted transition-colors" strokeWidth={1.4} />
                   {label}
                 </Link>
               </li>
@@ -79,11 +79,11 @@ export function NavDrawer({ role }: { role: Role }) {
                 key={label}
                 aria-disabled
                 title={`${label} — disponível na ${phase}`}
-                className="flex items-center gap-4 rounded-sm px-1 py-2.5 text-title text-[#c9ceda]"
+                className="flex items-center gap-3 rounded-sm px-1 py-1.5 text-[13px] leading-[17px] text-[#c9ceda]"
               >
-                <Icon className="size-7 shrink-0 text-ink-muted" strokeWidth={1.4} />
+                <Icon className="size-5 shrink-0 text-ink-muted" strokeWidth={1.4} />
                 <span className="opacity-70">{label}</span>
-                <span className="ml-auto rounded-full bg-surface px-2 py-0.5 text-label text-ink-muted">{phase}</span>
+                <span className="ml-auto rounded-full bg-surface px-1.5 py-px text-[10px] leading-[14px] text-ink-muted">{phase}</span>
               </li>
             ),
           )}
