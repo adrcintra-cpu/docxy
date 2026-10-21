@@ -24,7 +24,7 @@ export function AppHeader({
   unreadCount: number;
 }) {
   return (
-    <header className="flex h-16 items-center gap-4 rounded-lg border border-[#3b4459] bg-[linear-gradient(180deg,rgba(74,86,110,.5)_0%,rgba(40,48,66,.5)_100%)] px-4 shadow-[0_8px_20px_-6px_rgba(0,0,0,.35)] backdrop-blur-md sm:h-20 sm:px-8">
+    <header className="relative z-30 flex h-16 items-center gap-4 rounded-lg border border-[#3b4459] bg-[linear-gradient(180deg,rgba(74,86,110,.5)_0%,rgba(40,48,66,.5)_100%)] px-4 shadow-[0_8px_20px_-6px_rgba(0,0,0,.35)] backdrop-blur-md sm:h-20 sm:px-8">
       <label htmlFor="nav-toggle" className="cursor-pointer rounded-full p-2 text-ink-muted hover:bg-white/5 hover:text-ink" aria-label="Abrir menu">
         <Menu className="size-[22px]" strokeWidth={1.5} />
       </label>
