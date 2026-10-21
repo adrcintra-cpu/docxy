@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { Bell, LogOut, Menu, MicOff, User as UserIcon } from "lucide-react";
+import { Bell, LogOut, Menu, User as UserIcon } from "lucide-react";
 import type { Notification, Role } from "@prisma/client";
 import { Logo } from "@/components/brand/logo";
 import { signOut } from "@/app/auth/actions";
@@ -28,10 +28,6 @@ export function AppHeader({
         <Menu className="size-7" strokeWidth={1.5} />
       </label>
       <div className="ml-auto flex items-center gap-3 sm:gap-6">
-        {/* Assistente de voz: ainda não disponível (estado identificado). */}
-        <span title="Assistente de voz — disponível em fase futura" aria-label="Assistente de voz indisponível" className="hidden text-ink-subtle sm:inline-flex">
-          <MicOff className="size-6" strokeWidth={1.5} />
-        </span>
         <Logo className="hidden h-8 sm:block" />
 
         <details className="group relative">
