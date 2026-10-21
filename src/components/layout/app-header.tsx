@@ -23,18 +23,18 @@ export function AppHeader({
   unreadCount: number;
 }) {
   return (
-    <header className="flex h-16 items-center gap-4 rounded-lg border border-white/5 bg-raised px-4 shadow-panel sm:h-20 sm:px-8">
+    <header className="flex h-16 items-center gap-4 rounded-lg border border-[#3b4459] bg-[linear-gradient(180deg,rgba(74,86,110,.5)_0%,rgba(40,48,66,.5)_100%)] px-4 shadow-[0_8px_20px_-6px_rgba(0,0,0,.35)] backdrop-blur-md sm:h-20 sm:px-8">
       <label htmlFor="nav-toggle" className="cursor-pointer rounded-full p-2 text-ink-muted hover:text-ink" aria-label="Abrir menu">
-        <Menu className="size-7" strokeWidth={1.5} />
+        <Menu className="size-[22px]" strokeWidth={1.5} />
       </label>
       <div className="ml-auto flex items-center gap-3 sm:gap-6">
-        <Logo className="hidden h-8 sm:block" />
+        <Logo className="hidden h-6 sm:block" />
 
         <details className="group relative">
-          <summary className="flex size-12 cursor-pointer list-none items-center justify-center rounded-full bg-page text-ink hover:ring-2 hover:ring-line" aria-label="Perfil">
-            <UserIcon className="size-6" strokeWidth={1.5} />
+          <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-full bg-page text-ink hover:ring-2 hover:ring-line" aria-label="Perfil">
+            <UserIcon className="size-5" strokeWidth={1.5} />
           </summary>
-          <div className="absolute right-0 z-30 mt-3 w-72 rounded-md border border-line bg-overlay p-4 shadow-panel">
+          <div className="absolute right-0 z-30 mt-4 w-72 rounded-md border border-line bg-overlay p-4 shadow-panel">
             <p className="truncate text-body font-semibold">{userName}</p>
             <p className="truncate text-body-sm text-ink-muted">{userEmail}</p>
             <p className="mt-2 text-label text-ink-muted">{ROLE_LABEL[role]} · {organizationName}</p>
@@ -47,11 +47,11 @@ export function AppHeader({
         </details>
 
         <details className="relative">
-          <summary className="relative flex size-12 cursor-pointer list-none items-center justify-center rounded-full text-ink hover:bg-surface" aria-label={`Notificações${unreadCount ? ` (${unreadCount} não lidas)` : ""}`}>
-            <Bell className="size-7" strokeWidth={1.5} />
-            {unreadCount > 0 && <span className="absolute right-2.5 top-2.5 size-3 rounded-full bg-alert ring-2 ring-raised" />}
+          <summary className="relative flex size-10 cursor-pointer list-none items-center justify-center rounded-full text-ink hover:bg-surface" aria-label={`Notificações${unreadCount ? ` (${unreadCount} não lidas)` : ""}`}>
+            <Bell className="size-[22px]" strokeWidth={1.5} />
+            {unreadCount > 0 && <span className="absolute right-2 top-1.5 size-2.5 rounded-full bg-alert" />}
           </summary>
-          <div className="absolute right-0 z-30 mt-3 w-80 rounded-md border border-line bg-overlay p-2 shadow-panel">
+          <div className="absolute right-0 z-30 mt-4 w-80 rounded-md border border-line bg-overlay p-2 shadow-panel">
             <p className="px-2 py-2 text-label text-ink-muted">Notificações</p>
             {notifications.length === 0 ? (
               <p className="px-2 py-6 text-center text-body-sm text-ink-muted">Nenhuma notificação por enquanto.</p>
